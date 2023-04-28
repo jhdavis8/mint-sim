@@ -27,11 +27,6 @@ class Mapping {
   int count;
 };
 
-class CAM {
- public:
-  std::vector<Mapping> data;
-};
-
 enum TaskType { search, bookkeep, backtrack };
 
 class Task {
@@ -41,7 +36,7 @@ class Task {
   int eM = -1;
   int time = INT_MAX;
   std::stack<int> eStack;
-  CAM nodeMap;
+  std::vector<Mapping> nodeMap;
 };
 
 class TaskQueue {
@@ -58,7 +53,10 @@ class TargetMotif {
 
 class MappingStore {
  public:
-  std::vector<CAM> store;
+  std::vector<std::vector<Mapping>> store;
+
+  // Store CAM of found motif.
+  void addResult(Task& task);
 };
 
 class ContextMem {
@@ -68,7 +66,7 @@ class ContextMem {
   int eM = -1;
   int time = INT_MAX;
   std::stack<int> eStack;
-  CAM nodeMap;
+  std::vector<Mapping> nodeMap;
 };
 
 // *****************************************************************************
@@ -80,10 +78,12 @@ enum MgrStatus { end, dispatch, backtrack };
 class ContextMgr {
  public:
   ContextMem& cMem;
+  MappingStore& mStr;
+  std::vector<Edge>& edgeList;
   int& cycles;
 
-  // Link ContextMem to ContextMgr.
-  void setup(ContextMem& c, int& cycles);
+  // Link ContextMem, edgeList, and MappingStore to ContextMgr.
+  void setup(ContextMem& c, MappingStore& m, std::vector<Edge>& eL, int& cyc);
 
   // Update ContextMem according to info in task. Returns a status code to
   // direct the ComputeUnit how to continue.
@@ -97,7 +97,7 @@ class Dispatcher {
   int& cycles;
 
   // Link Dispatcher to ContentMem and TargetMotif.
-  void setup(ContextMem& c, TargetMotif& m, int& cycles);
+  void setup(ContextMem& c, TargetMotif& m, int& cyc);
 
   // Load necessary data into task from TargetMotif and ContextMem.
   void dispatch(Task& task);
@@ -109,7 +109,7 @@ class SearchEng {
   int& cycles;
 
   // Link SearchEng to ContextMem.
-  void setup(ContextMem& c; int& cycles);
+  void setup(ContextMem& c; int& cyc);
 
   // Linear cache-line search for successor edges
   std::vector<Edge> searchPhaseOne(Task& task);
@@ -140,6 +140,7 @@ class Mint {
   TaskQueue tQ;
   TargetMotif tM;
   MappingStore results;
+  std::vector<Edge> edgeList;
   
   // Load motif into TargetMotif and load graph into DRAM, set up TaskQueue.
   // Call setup method for each ComputeUnit.
