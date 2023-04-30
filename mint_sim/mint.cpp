@@ -17,7 +17,7 @@ MgrStatus ContextMgr::updateContext(Task& task) {
   switch (task.type) {
     case bookkeep:
       if (task.eM == motifSize - 1) {
-        status = end;
+        status = backtrack;
         mStr.addResult(task);
       } else {
         status = dispatch;
@@ -25,15 +25,23 @@ MgrStatus ContextMgr::updateContext(Task& task) {
         vG = edgeList[eG].v;
         uM = edgeList[eM].u;
         vM = edgeList[eM].v;
-        cMem.nodeMap.push_back(Mapping(uM, uG, 0));
-        cMem.nodeMap.push_back(Mapping(vM, vG, 0));
+        bool uG_found = false;
+        bool vG_found = false;
         for (int i = 0; i < cMem.nodeMap.length(); i++) {
           if (cMem.nodeMap[i].gNode == uG) {
             cMem.nodeMap[i].count++;
+            uG_found = true;
           }
           if (cMem.nodeMap[i].gNode == vG) {
             cMem.nodeMap[i].count++;
+            vG_found = true;
           }
+        }
+        if (!uG_found) {
+          cMem.nodeMap.push_back(Mapping(uM, uG, 1));
+        }
+        if (!vG_found) {
+          cMem.nodeMap.push_back(Mapping(vM, vG, 0));
         }
         if (cMem.eStack.isEmpty()) {
           cMem.time = edgeList[eG].time + motifTime;
@@ -53,7 +61,21 @@ MgrStatus ContextMgr::updateContext(Task& task) {
           if (eStack.isEmpty()) {
             cMem.time = INT_MAX;
           }
-          
+          for (int i = 0; i < cMem.nodeMap.length(); i++) {
+            if (cMem.nodeMap[i].gNode == uG) {
+              cMem.nodeMap[i].count--;
+            }
+            if (cMem.nodeMap[i].gNode == vG) {
+              cMem.nodeMap[i].count--;
+            }
+            if (cMem.nodeMap[i].count == 0) {
+              cMem.nodeMap.erase(i);
+              i--;
+            }
+          }
+        } else {
+          status = end;
+          break;
         }
       }
       break;
