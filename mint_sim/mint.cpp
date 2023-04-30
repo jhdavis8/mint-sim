@@ -130,8 +130,26 @@ void SearchEng::setup(ContextMem& c, std::vector<Edge>& eL, int& cyc) {
 }
 
 std::vector<Edge> searchPhaseOne(Task& task) {
-  std::vector<Edge> filteredEdges;
+  std::vector<Edge> fEdges;
   for (int i = 0; i < edgeList.length(); i++) {
-    if 
+    if (task.uG >= 0 && task.vG >= 0) {
+      if (edgeList[i].u == task.uG && edgeList[i].v == task.vG) {
+        fEdges.push_back(edgeList[i]);
+      }
+    } else if (task.uG >= 0) {
+      if (edgeList[i].u == task.uG) {
+        fEdges.push_back(edgeList[i]);
+      }
+    } else if (task.vG >= 0) {
+      if (edgeList[i].v == task.vG) {
+        fEdges.push_back(edgeList[i]);
+      }
+    }
+  }
+  for (int i = 0; i < fEdges.length(); i++) {
+    if (fEdges[i].time < edgeList[eG].time) {
+      fEdges.erase(i);
+      i--;
+    }
   }
 }
