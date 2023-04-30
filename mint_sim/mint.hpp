@@ -34,20 +34,26 @@ class Task {
   TaskType type;
   int eG = -1;
   int eM = -1;
+  int uG = -1;
+  int vG = -1;
+  int uM = -1;
+  int vM = -1;
   int time = INT_MAX;
-  std::stack<int> eStack;
-  std::vector<Mapping> nodeMap;
 };
 
 class TaskQueue {
  public:
   std::queue<Task> tasks;
+
+  // Fill TaskQueue with a root task for every node in graph.
   void loadTasks();
 };
 
 class TargetMotif {
  public:
   std::array<Edge, MOTIF_SIZE> motif;
+
+  // Load list of Edges for the target motif.
   void loadMotif();
 };
 
@@ -56,7 +62,7 @@ class MappingStore {
   std::vector<std::vector<Mapping>> store;
 
   // Store CAM of found motif.
-  void addResult(Task& task);
+  void addResult(ContextMem& cMem);
 };
 
 class ContextMem {
@@ -106,10 +112,11 @@ class Dispatcher {
 class SearchEng {
  public:
   ContextMem& cMem;
+  std::vector<Edge>& edgeList;
   int& cycles;
 
   // Link SearchEng to ContextMem.
-  void setup(ContextMem& c; int& cyc);
+  void setup(ContextMem& c, std::vector<Edge>& eL, int& cyc);
 
   // Linear cache-line search for successor edges
   std::vector<Edge> searchPhaseOne(Task& task);

@@ -3,6 +3,11 @@
 #include <stdio>
 #include "mint.hpp"
 
+void MappingStore::addResult(ContextMem& cMem) {
+  store.push_back(cMem.nodeMap); // need to make sure this saves a copy not a reference
+  return;
+}
+
 void ContextMgr::setup(ContextMem& c, MappingStore& m, std::vector<Edge>& eL, int& cyc) {
   cMem = c;
   mStr = m;
@@ -21,10 +26,10 @@ MgrStatus ContextMgr::updateContext(Task& task) {
         mStr.addResult(task);
       } else {
         status = dispatch;
-        uG = edgeList[eG].u;
-        vG = edgeList[eG].v;
-        uM = edgeList[eM].u;
-        vM = edgeList[eM].v;
+        uG = task.uG;
+        vG = task.vG;
+        uM = task.uM;
+        vM = task.vM;
         bool uG_found = false;
         bool vG_found = false;
         for (int i = 0; i < cMem.nodeMap.length(); i++) {
@@ -57,7 +62,7 @@ MgrStatus ContextMgr::updateContext(Task& task) {
       while (eG > edgeList.length() || edgeList[eG].time > cMem.time) {
         if (!eStack.isEmpty()) {
           status = dispatch;
-          cMem.eG = eStack.pop() + 1;
+          cMem.eG = eStack.pop() + 1; // why add one here?
           if (eStack.isEmpty()) {
             cMem.time = INT_MAX;
           }
@@ -73,6 +78,7 @@ MgrStatus ContextMgr::updateContext(Task& task) {
               i--;
             }
           }
+          cMem.eM--;
         } else {
           status = end;
           break;
@@ -81,5 +87,51 @@ MgrStatus ContextMgr::updateContext(Task& task) {
       break;
     default:
       std::cout << "Error: updateContext received invalid task type." << std::endl;
+  }
   return status;
+}
+
+void Dispatcher::setup(ContextMem& c, TargetMotif& m, int& cyc) {
+  cMem = c;
+  TargetMotif = m;
+  cycles = cyc;
+  return;
+}
+
+void Dispatcher::dispatch(Task& task) {
+  task.type = search;
+  task.eM = cMem.eM;
+  task.eG = cMem.eG;
+  task.uM = tM.motif[eM].u;
+  task.vM = tM.motif[eM].v;
+  auto iterator = std::ranges:find_if(cMem.nodeMap.begin(), cMem.nodeMap.end(),
+                                      [](Mapping i) { return i.mNode == task.uM; });
+  if (iterator != cMem.nodeMap.end()) {
+    task.uG = *iterator;
+  } else {
+    task.uG = -1;
+  }
+  auto iterator = std::ranges:find_if(cMem.nodeMap.begin(), cMem.nodeMap.end(),
+                                      [](Mapping i) { return i.mNode == task.vM; });
+  if (iterator != cMem.nodeMap.end()) {
+    task.vG = *iterator;
+  } else {
+    task.vG = -1;
+  }
+  task.time = cMem.time;
+  return;
+}
+
+void SearchEng::setup(ContextMem& c, std::vector<Edge>& eL, int& cyc) {
+  cMem = c;
+  cycles = cyc;
+  edgeList = eL;
+  return;
+}
+
+std::vector<Edge> searchPhaseOne(Task& task) {
+  std::vector<Edge> filteredEdges;
+  for (int i = 0; i < edgeList.length(); i++) {
+    if 
+  }
 }
