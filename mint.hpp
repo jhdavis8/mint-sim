@@ -25,6 +25,8 @@ class Mapping {
   int mNode;
   int gNode;
   int count;
+
+  Mapping(int m, int g, int c): mNode(m), gNode(g), count(c) {}
 };
 
 enum TaskType { search, bookkeep, backtrack };
@@ -39,7 +41,7 @@ class Task {
   int uM = -1;
   int vM = -1;
   int time = INT_MAX;
-  std::vector<Mapping>& nodeMap;
+  std::vector<Mapping> nodeMap;
 
   // Return true iff there exists a Mapping in nodeMap between gN and mN.
   bool isMapped(int gN, int mN);
@@ -58,14 +60,6 @@ class TargetMotif {
   std::array<Edge, MOTIF_SIZE> motif;
 };
 
-class MappingStore {
- public:
-  std::vector<std::vector<Mapping>> store;
-
-  // Store CAM of found motif.
-  void addResult(ContextMem& cMem);
-};
-
 class ContextMem {
  public:
   bool busy = false;
@@ -76,21 +70,30 @@ class ContextMem {
   std::vector<Mapping> nodeMap;
 };
 
+class MappingStore {
+ public:
+  std::vector<std::vector<Mapping>> store;
+
+  // Store CAM of found motif.
+  void addResult(ContextMem& cMem);
+};
+
 // *****************************************************************************
 // *                         Architecture Components                           *
 // *****************************************************************************
 
-enum MgrStatus { end, dispatch, backtrack };
+enum MgrStatus { end, dispatch, remanage };
 
 class ContextMgr {
  public:
   ContextMem& cMem;
-  MappingStore& mStr;
+  MappingStore& results;
   std::vector<Edge>& edgeList;
   int& cycles;
 
   // Link ContextMem, edgeList, and MappingStore to ContextMgr.
-  void setup(ContextMem& c, MappingStore& m, std::vector<Edge>& eL, int& cyc);
+  ContextMgr(ContextMem& c, MappingStore& r, std::vector<Edge>& eL, int& cyc):
+      cMem(c), results(r), edgeList(eL), cycles(cyc) {}
 
   // Update ContextMem according to info in task. Returns a status code to
   // direct the ComputeUnit how to continue.
@@ -100,11 +103,12 @@ class ContextMgr {
 class Dispatcher {
  public:
   ContextMem& cMem;
-  TargetMotif& motif;
+  TargetMotif& tM;
   int& cycles;
 
   // Link Dispatcher to ContentMem and TargetMotif.
-  void setup(ContextMem& c, TargetMotif& m, int& cyc);
+  Dispatcher(ContextMem& c, TargetMotif& m, int& cyc):
+      cMem(c), tM(m), cycles(cyc) {}
 
   // Load necessary data into task from TargetMotif and ContextMem.
   void dispatch(Task& task);
@@ -117,7 +121,8 @@ class SearchEng {
   int& cycles;
 
   // Link SearchEng to ContextMem.
-  void setup(ContextMem& c, std::vector<Edge>& eL, int& cyc);
+  SearchEng(ContextMem& c, std::vector<Edge>& eL, int& cyc):
+      cMem(c), edgeList(eL), cycles(cyc) {}
 
   // Linear cache-line search for successor edges
   std::vector<int> searchPhaseOne(Task& task);
@@ -128,15 +133,19 @@ class SearchEng {
 
 class ComputeUnit {
  public:
+  MappingStore& results;
+  TargetMotif& tM;
+  std::vector<Edge>& edgeList;
+  int cycles;
   ContextMem cMem;
   ContextMgr cMgr;
   Dispatcher disp;
   SearchEng sEng;
-  MappingStore& results;
-  int cycles;
 
   // Link all components appropriately.
-  void setup(MappingStore& r, TargetMotif& t, std::vector<Edge>& eL);
+  ComputeUnit(MappingStore& r, TargetMotif& t, std::vector<Edge>& eL):
+      results(r), tM(t), edgeList(eL), cMgr(cMem, results, edgeList, cycles),
+      disp(cMem, tM, cycles), sEng(cMem, edgeList, cycles) {}
   
   // Executes a root task to completion. Records total cycles taken. Writes
   // resulting finds to the MappingStore.
@@ -151,7 +160,7 @@ class Mint {
   MappingStore results;
   std::vector<Edge> edgeList;
   
-  // Call setup method for each ComputeUnit and TaskQueue.
+  // Call setup method for TaskQueue.
   void setup();
 
   // Start up each ComputeUnit loop, which will draw tasks from the TaskQueue to

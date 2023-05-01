@@ -1,11 +1,12 @@
 // Definitions for Mint simulator
 
 #include <iostream>
+#include <algorithm>
 #include "mint.hpp"
 
 bool Task::isMapped(int gN, int mN) {
   bool result = false;
-  for (int i = 0; i < nodeMap.length(); i++) {
+  for (int i = 0; i < nodeMap.size(); i++) {
     if (nodeMap[i].gNode == gN && nodeMap[i].mNode == mN) {
       if (nodeMap[i].count < 1) {
         std::cerr << "Error: found a zero-count mapping in search." << std::endl;
@@ -18,7 +19,7 @@ bool Task::isMapped(int gN, int mN) {
 }
 
 void TaskQueue::setup(std::vector<Edge>& edgeList) {
-  for (int i = 0; i < edgeList.length(); i++) {
+  for (int i = 0; i < edgeList.size(); i++) {
     Task t;
     t.eG = i;
     t.type = backtrack;
@@ -32,31 +33,23 @@ void MappingStore::addResult(ContextMem& cMem) {
   return;
 }
 
-void ContextMgr::setup(ContextMem& c, MappingStore& m, std::vector<Edge>& eL, int& cyc) {
-  cMem = c;
-  mStr = m;
-  edgeList = eL;
-  cycles = cyc;
-  return;
-}
-
 MgrStatus ContextMgr::updateContext(Task& task) {
   MgrStatus status;
   cMem.busy = true;
   switch (task.type) {
     case bookkeep:
       if (task.eM == motifSize - 1) {
-        status = backtrack;
-        mStr.addResult(task);
+        status = remanage;
+        results.addResult(task);
       } else {
         status = dispatch;
-        uG = task.uG;
-        vG = task.vG;
-        uM = task.uM;
-        vM = task.vM;
+        int uG = task.uG;
+        int vG = task.vG;
+        int uM = task.uM;
+        int vM = task.vM;
         bool uG_found = false;
         bool vG_found = false;
-        for (int i = 0; i < cMem.nodeMap.length(); i++) {
+        for (int i = 0; i < cMem.nodeMap.size(); i++) {
           if (cMem.nodeMap[i].gNode == uG) {
             cMem.nodeMap[i].count++;
             uG_found = true;
@@ -72,10 +65,10 @@ MgrStatus ContextMgr::updateContext(Task& task) {
         if (!vG_found) {
           cMem.nodeMap.push_back(Mapping(vM, vG, 0));
         }
-        if (cMem.eStack.isEmpty()) {
-          cMem.time = edgeList[eG].time + motifTime;
+        if (cMem.eStack.empty()) {
+          cMem.time = edgeList[task.eG].time + motifTime;
         }
-        cMem.eStack.push(eG);
+        cMem.eStack.push(task.eG);
         cMem.eM += 1;
         // need to figure out correct eM and eG management between task and cMem
         // Also what about busy?
@@ -83,18 +76,19 @@ MgrStatus ContextMgr::updateContext(Task& task) {
       break;
     case backtrack:
       cMem.eG += 1;
-      while (eG > edgeList.length() || edgeList[eG].time > cMem.time) {
-        if (!eStack.isEmpty()) {
+      while (cMem.eG > edgeList.size() || edgeList[cMem.eG].time > cMem.time) {
+        if (!cMem.eStack.empty()) {
           status = dispatch;
-          cMem.eG = eStack.pop() + 1; // why add one here?
-          if (eStack.isEmpty()) {
+          cMem.eG = cMem.eStack.top() + 1; // why add one here?
+          cMem.eStack.pop();
+          if (cMem.eStack.empty()) {
             cMem.time = INT_MAX;
           }
-          for (int i = 0; i < cMem.nodeMap.length(); i++) {
-            if (cMem.nodeMap[i].gNode == uG) {
+          for (int i = 0; i < cMem.nodeMap.size(); i++) {
+            if (cMem.nodeMap[i].gNode == task.uG) {
               cMem.nodeMap[i].count--;
             }
-            if (cMem.nodeMap[i].gNode == vG) {
+            if (cMem.nodeMap[i].gNode == task.vG) {
               cMem.nodeMap[i].count--;
             }
             if (cMem.nodeMap[i].count == 0) {
@@ -115,28 +109,21 @@ MgrStatus ContextMgr::updateContext(Task& task) {
   return status;
 }
 
-void Dispatcher::setup(ContextMem& c, TargetMotif& m, int& cyc) {
-  cMem = c;
-  TargetMotif = m;
-  cycles = cyc;
-  return;
-}
-
 void Dispatcher::dispatch(Task& task) {
   task.type = search;
   task.eM = cMem.eM;
   task.eG = cMem.eG;
   task.uM = tM.motif[eM].u;
   task.vM = tM.motif[eM].v;
-  auto iterator = std::ranges:find_if(cMem.nodeMap.begin(), cMem.nodeMap.end(),
-                                      [](Mapping i) { return i.mNode == task.uM; });
+  auto iterator = std::ranges::find_if(cMem.nodeMap.begin(), cMem.nodeMap.end(),
+                                       [&](Mapping i) { return i.mNode == task.uM; });
   if (iterator != cMem.nodeMap.end()) {
     task.uG = *iterator;
   } else {
     task.uG = -1;
   }
-  auto iterator = std::ranges:find_if(cMem.nodeMap.begin(), cMem.nodeMap.end(),
-                                      [](Mapping i) { return i.mNode == task.vM; });
+  iterator = std::ranges::find_if(cMem.nodeMap.begin(), cMem.nodeMap.end(),
+                                  [&](Mapping i) { return i.mNode == task.vM; });
   if (iterator != cMem.nodeMap.end()) {
     task.vG = *iterator;
   } else {
@@ -146,16 +133,9 @@ void Dispatcher::dispatch(Task& task) {
   return;
 }
 
-void SearchEng::setup(ContextMem& c, std::vector<Edge>& eL, int& cyc) {
-  cMem = c;
-  cycles = cyc;
-  edgeList = eL;
-  return;
-}
-
 std::vector<int> SearchEng::searchPhaseOne(Task& task) {
   std::vector<int> fEdges;
-  for (int i = 0; i < edgeList.length(); i++) {
+  for (int i = 0; i < edgeList.size(); i++) {
     if ((task.uG >= 0 && task.vG >= 0)
         && (edgeList[i].u == task.uG && edgeList[i].v == task.vG)) {
       fEdges.push_back(i);
@@ -167,7 +147,7 @@ std::vector<int> SearchEng::searchPhaseOne(Task& task) {
       fEdges.push_back(i);
     }
   }
-  for (int i = 0; i < fEdges.length(); i++) {
+  for (int i = 0; i < fEdges.size(); i++) {
     if (fEdges[i] < eG) {
       fEdges.erase(i);
       i--;
@@ -179,10 +159,10 @@ std::vector<int> SearchEng::searchPhaseOne(Task& task) {
 void searchPhaseTwo(Task& task, std::vector<int> fEdges) {
   // Fetch full edge data
   std::vector<Edge> fEdgesData;
-  for (int i = 0; i < fEdges.length(); i++) {
+  for (int i = 0; i < fEdges.size(); i++) {
     fEdgesData.push_back(edgeList[fEdges[i]]);
   }
-  for (int i = 0; i < fEdgesData.length(); i++) {
+  for (int i = 0; i < fEdgesData.size(); i++) {
     if (fEdgesData[i].time < task.time
         && (!task.isMapped(fEdgesData[i].u, task.uM)
             || !task.isMapped(fEdgesData[i].u, task.uM))) {
@@ -192,14 +172,6 @@ void searchPhaseTwo(Task& task, std::vector<int> fEdges) {
     }
   }
   task.type = backtrack; // Not really sure what to do here
-  return;
-}
-
-void ComputeUnit::setup(MappingStore& r, TargetMotif& t, std::vector<Edge>& eL) {
-  results = r;
-  cMgr.setup(cMem, r, eL, cycles);
-  disp.setup(cMem, t, cycles);
-  sEng.setup(cMem, eL, cycles);
   return;
 }
 
@@ -216,7 +188,7 @@ void ComputeUnit::executeRootTask(Task t) {
         disp.dispatch(t);
         sEng.searchPhaseTwo(t, sEng.searchPhaseOne(t));
         break;
-      case backtrack:
+      case remanage:
         t.type = backtrack;
         break;
       default:
@@ -228,7 +200,7 @@ void ComputeUnit::executeRootTask(Task t) {
 
 void Mint::setup() {
   for (int i = 0; i < NUM_CUS; i++) {
-    cUnits[i].setup(results, tM, edgeList);
+    cUnits[i] = ComputeUnit(results, tM, edgeList);
   }
   tQ.setup(std::vector<Edge>& edgeList);
   return;

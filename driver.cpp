@@ -1,7 +1,7 @@
 // Driver for the Mint simulator
 
 #include <iostream>
-#include <ifstream>
+#include <fstream>
 #include <string>
 #include "mint.hpp"
 
@@ -41,8 +41,12 @@ int loadFiles(int argc, char** argv, std::vector<Edge>& edgeList,
   if (dataFileG.is_open()) {
     while (std::getline(dataFileG, line)) {
       std::vector<std::string> v;
+      Edge e;
       split(line, v, ' ');
-      edgeList.push_back(Edge(v[0], v[1], v[2]));
+      e.u = std::stoi(v[0]);
+      e.v = std::stoi(v[1]);
+      e.time = std::stoi(v[2]);
+      edgeList.push_back(e);
     }
     dataFileG.close();
   } else {
@@ -50,19 +54,22 @@ int loadFiles(int argc, char** argv, std::vector<Edge>& edgeList,
     return 1;
   }
   std::ifstream dataFileM(argv[2]);
-  std::string line;
   if (dataFileM.is_open()) {
     int i = 0;
     while (std::getline(dataFileM, line)) {
       std::vector<std::string> v;
+      Edge e;
       split(line, v, ' ');
-      if (i > motif.length()) {
+      if (i > motif.size()) {
         std::cerr <<
             "Error: motif is too large. Recompile with larger MOTIF_SIZE." <<
             std::endl;
         return 1;
       }
-      motif[i] = Edge(v[0], v[1], v[2]);
+      e.u = std::stoi(v[0]);
+      e.v = std::stoi(v[1]);
+      e.time = std::stoi(v[2]);
+      motif[i] = e;
       i++;
     }
     dataFileM.close();
