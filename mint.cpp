@@ -1,7 +1,21 @@
 // Definitions for Mint simulator
 
-#include <stdio>
+#include <iostream>
 #include "mint.hpp"
+
+bool isMapped(int gN, int mN) {
+  bool result = false;
+  for (int i = 0; i < nodeMap.length(); i++) {
+    if (nodeMap[i].gNode == gN && nodeMap[i].mNode == mN) {
+      if (nodeMap[i].count < 1) {
+        std::cerr << "Error: found a zero-count mapping in search." << std::endl;
+      }
+      result = true;
+      break;
+    }
+  }
+  return result;
+}
 
 void MappingStore::addResult(ContextMem& cMem) {
   store.push_back(cMem.nodeMap); // need to make sure this saves a copy not a reference
@@ -52,7 +66,7 @@ MgrStatus ContextMgr::updateContext(Task& task) {
           cMem.time = edgeList[eG].time + motifTime;
         }
         cMem.eStack.push(eG);
-        cMem.eM += 1; // is this correct/necessary in the parallel context?
+        cMem.eM += 1;
         // need to figure out correct eM and eG management between task and cMem
         // Also what about busy?
       }
@@ -86,7 +100,7 @@ MgrStatus ContextMgr::updateContext(Task& task) {
       }
       break;
     default:
-      std::cout << "Error: updateContext received invalid task type." << std::endl;
+      std::cerr << "Error: updateContext received invalid task type." << std::endl;
   }
   return status;
 }
@@ -168,5 +182,53 @@ void searchPhaseTwo(Task& task, std::vector<int> fEdges) {
     }
   }
   task.type = backtrack; // Not really sure what to do here
+  return;
+}
+
+void ComputeUnit::executeRootTask(Task t) {
+  bool working = true;
+  while (working) {
+    MgrStatus mStatus;
+    mStatus = cMgr.updateContext(t);
+    switch (mStatus) {
+      case end:
+        working = false;
+        break;
+      case dispatch:
+        disp.dispatch(t);
+        sEng.searchPhaseTwo(t, sEng.searchPhaseOne(t));
+        break;
+      case backtrack:
+        t.type = backtrack;
+        break;
+      default:
+        std::cerr << "Error: Unrecognized Context Manager status code" << std::endl;
+    }
+  }
+  return;
+}
+
+void Mint::run() {
+  while (!tQ.empty()) {
+    // Find CU that is earliest in time to give a task to
+    ComputeUnit& nextCU = cUnits[0];
+    for (int i = 0; i < NUM_CUS; i++) {
+      if (cUnits[i].cycles < nextCU.cycles) {
+        nextCU = cUnits[i];
+      }
+    }
+    nextCU.executeRootTask(tQ.pop(), results);
+  }
+  // Collect cycle stats
+  ComputeUnit& maxCU = cUnits[0];
+  int totalCycles = 0;
+  for (int i = 0; i < NUM_CUS; i++) {
+    if (cUnits[i].cycles > maxCU.cycles) {
+      maxCU = cUnits[i];
+    }
+    totalCycles += cUnits[i].cycles;
+  }
+  std::cout << "Total cycles taken: " << totalCycles << std::endl;
+  std::cout << "End-to-end cycle count: " << maxCU.cycles << std::endl;
   return;
 }

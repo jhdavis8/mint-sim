@@ -39,6 +39,10 @@ class Task {
   int uM = -1;
   int vM = -1;
   int time = INT_MAX;
+  std::vector<Mapping>& nodeMap;
+
+  // Return true iff there exists a Mapping in nodeMap between gN and mN.
+  bool isMapped(int gN, int mN);
 };
 
 class TaskQueue {
@@ -134,11 +138,11 @@ class ComputeUnit {
   int cycles;
 
   // Allocate memory for all components and link them appropriately.
-  void setup();
+  void setup(MappingStore& results);
   
   // Executes a root task to completion. Records total cycles taken. Writes
   // resulting finds to the MappingStore.
-  void executeRootTask(Task t, MappingStore& results);
+  void executeRootTask(Task t);
 };
 
 class Mint {
