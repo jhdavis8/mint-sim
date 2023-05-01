@@ -79,6 +79,7 @@ int main(int argc, char** argv) {
   if (result != 0) {
     return result;
   }
-  
+  mint.setup();
+  mint.run();
   return 0;
 }

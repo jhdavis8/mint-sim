@@ -50,15 +50,12 @@ class TaskQueue {
   std::queue<Task> tasks;
 
   // Fill TaskQueue with a root task for every node in graph.
-  void loadTasks();
+  void setup(std::vector<Edge>& edgeList);
 };
 
 class TargetMotif {
  public:
   std::array<Edge, MOTIF_SIZE> motif;
-
-  // Load list of Edges for the target motif.
-  void loadMotif();
 };
 
 class MappingStore {
@@ -135,10 +132,11 @@ class ComputeUnit {
   ContextMgr cMgr;
   Dispatcher disp;
   SearchEng sEng;
+  MappingStore& results;
   int cycles;
 
-  // Allocate memory for all components and link them appropriately.
-  void setup(MappingStore& results);
+  // Link all components appropriately.
+  void setup(MappingStore& r, TargetMotif& t, std::vector<Edge>& eL);
   
   // Executes a root task to completion. Records total cycles taken. Writes
   // resulting finds to the MappingStore.
@@ -153,9 +151,8 @@ class Mint {
   MappingStore results;
   std::vector<Edge> edgeList;
   
-  // Load motif into TargetMotif and load graph into DRAM, set up TaskQueue.
-  // Call setup method for each ComputeUnit.
-  void loadData();
+  // Call setup method for each ComputeUnit and TaskQueue.
+  void setup();
 
   // Start up each ComputeUnit loop, which will draw tasks from the TaskQueue to
   // pass to ContextMgr. This continues until the TaskQueue is empty. Final

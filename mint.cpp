@@ -3,7 +3,7 @@
 #include <iostream>
 #include "mint.hpp"
 
-bool isMapped(int gN, int mN) {
+bool Task::isMapped(int gN, int mN) {
   bool result = false;
   for (int i = 0; i < nodeMap.length(); i++) {
     if (nodeMap[i].gNode == gN && nodeMap[i].mNode == mN) {
@@ -15,6 +15,16 @@ bool isMapped(int gN, int mN) {
     }
   }
   return result;
+}
+
+void TaskQueue::setup(std::vector<Edge>& edgeList) {
+  for (int i = 0; i < edgeList.length(); i++) {
+    Task t;
+    t.eG = i;
+    t.type = backtrack;
+    tasks.push(t);
+  }
+  return;
 }
 
 void MappingStore::addResult(ContextMem& cMem) {
@@ -185,6 +195,14 @@ void searchPhaseTwo(Task& task, std::vector<int> fEdges) {
   return;
 }
 
+void ComputeUnit::setup(MappingStore& r, TargetMotif& t, std::vector<Edge>& eL) {
+  results = r;
+  cMgr.setup(cMem, r, eL, cycles);
+  disp.setup(cMem, t, cycles);
+  sEng.setup(cMem, eL, cycles);
+  return;
+}
+
 void ComputeUnit::executeRootTask(Task t) {
   bool working = true;
   while (working) {
@@ -202,9 +220,17 @@ void ComputeUnit::executeRootTask(Task t) {
         t.type = backtrack;
         break;
       default:
-        std::cerr << "Error: Unrecognized Context Manager status code" << std::endl;
+        std::cerr << "Error: unrecognized Context Manager status code" << std::endl;
     }
   }
+  return;
+}
+
+void Mint::setup() {
+  for (int i = 0; i < NUM_CUS; i++) {
+    cUnits[i].setup(results, tM, edgeList);
+  }
+  tQ.setup(std::vector<Edge>& edgeList);
   return;
 }
 
