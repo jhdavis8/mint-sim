@@ -129,27 +129,44 @@ void SearchEng::setup(ContextMem& c, std::vector<Edge>& eL, int& cyc) {
   return;
 }
 
-std::vector<Edge> searchPhaseOne(Task& task) {
-  std::vector<Edge> fEdges;
+std::vector<int> SearchEng::searchPhaseOne(Task& task) {
+  std::vector<int> fEdges;
   for (int i = 0; i < edgeList.length(); i++) {
-    if (task.uG >= 0 && task.vG >= 0) {
-      if (edgeList[i].u == task.uG && edgeList[i].v == task.vG) {
-        fEdges.push_back(edgeList[i]);
-      }
-    } else if (task.uG >= 0) {
-      if (edgeList[i].u == task.uG) {
-        fEdges.push_back(edgeList[i]);
-      }
-    } else if (task.vG >= 0) {
-      if (edgeList[i].v == task.vG) {
-        fEdges.push_back(edgeList[i]);
-      }
+    if ((task.uG >= 0 && task.vG >= 0)
+        && (edgeList[i].u == task.uG && edgeList[i].v == task.vG)) {
+      fEdges.push_back(i);
+    } else if (task.uG >= 0 && edgeList[i].u == task.uG) {
+      fEdges.push_back(i);
+    } else if (task.vG >= 0 && edgeList[i].v == task.vG) {
+      fEdges.push_back(i);
+    } else if (task.uG < 0 && task.vG < 0) {
+      fEdges.push_back(i);
     }
   }
   for (int i = 0; i < fEdges.length(); i++) {
-    if (fEdges[i].time < edgeList[eG].time) {
+    if (fEdges[i] < eG) {
       fEdges.erase(i);
       i--;
     }
   }
+  return fEdges;
+}
+
+void searchPhaseTwo(Task& task, std::vector<int> fEdges) {
+  // Fetch full edge data
+  std::vector<Edge> fEdgesData;
+  for (int i = 0; i < fEdges.length(); i++) {
+    fEdgesData.push_back(edgeList[fEdges[i]]);
+  }
+  for (int i = 0; i < fEdgesData.length(); i++) {
+    if (fEdgesData[i].time < task.time
+        && (!task.isMapped(fEdgesData[i].u, task.uM)
+            || !task.isMapped(fEdgesData[i].u, task.uM))) {
+      task.eG = i;
+      task.type = bookkeep;
+      return;
+    }
+  }
+  task.type = backtrack; // Not really sure what to do here
+  return;
 }

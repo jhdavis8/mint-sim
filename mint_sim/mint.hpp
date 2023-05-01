@@ -119,10 +119,10 @@ class SearchEng {
   void setup(ContextMem& c, std::vector<Edge>& eL, int& cyc);
 
   // Linear cache-line search for successor edges
-  std::vector<Edge> searchPhaseOne(Task& task);
+  std::vector<int> searchPhaseOne(Task& task);
 
   // Linear mapping check over filtered edges
-  void searchPhaseTwo(Task& task, std::vector<Edge> filteredEdges);
+  void searchPhaseTwo(Task& task, std::vector<int> fEdges);
 };
 
 class ComputeUnit {
