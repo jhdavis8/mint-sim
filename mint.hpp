@@ -178,5 +178,8 @@ class Mint {
   // pass to ContextMgr. This continues until the TaskQueue is empty. Final
   // cycle count is the max cycles taken over each ComputeUnit.
   void run();
+
+ private:
+  void printResults();
 };
 

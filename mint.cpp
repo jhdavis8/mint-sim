@@ -53,11 +53,11 @@ MgrStatus ContextMgr::updateContext(Task& task) {
         cMem.nodeMap = task.nodeMap;
         results.addResult(cMem);
       } else {
-        std::cout << "Preparing context memory for dispatch" << std::endl;
+        std::cout << "Bookkeeping mapped edge " << task.eG << std::endl;
         status = dispatch;
-        int uG = task.uG;
-        int vG = task.vG;
-        int uM = task.uM;
+        int uG = edgeList[task.eG].u;
+        int vG = edgeList[task.eG].v;
+        int uM = task.uM; // Motif data is correct from last update by dispatch
         int vM = task.vM;
         bool uG_found = false;
         bool vG_found = false;
@@ -98,9 +98,11 @@ MgrStatus ContextMgr::updateContext(Task& task) {
       }
       break;
     case backtrack:
-      std::cout << "Context manager backtracking" << std::endl;
+      std::cout << "Context manager backtracking, current eG " <<
+          cMem.eG << std::endl;
       cMem.eG += 1;
-      while (cMem.eG > edgeList.size() || edgeList[cMem.eG].time > cMem.time) {
+      std::cout << "New eG is " << cMem.eG << std::endl;
+      while (cMem.eG >= edgeList.size() || edgeList[cMem.eG].time > cMem.time) {
         if (!cMem.eStack.empty()) {
           status = dispatch;
           cMem.eG = cMem.eStack.top() + 1; // why add one here?
@@ -121,7 +123,9 @@ MgrStatus ContextMgr::updateContext(Task& task) {
             }
           }
           cMem.eM--;
+          std::cout << "Backtrack done, new eM " << cMem.eM << std::endl;
         } else {
+          std::cout << "Popped last edge, search tree complete" << std::endl;
           status = end;
           break;
         }
@@ -137,7 +141,9 @@ MgrStatus ContextMgr::updateContext(Task& task) {
 
 void Dispatcher::dispatch(Task& task) {
   task.type = search;
+  // Motif edge to map, incremented only by bookkeep
   task.eM = cMem.eM;
+  // Graph edge to search for next edge from, set by backtrack
   task.eG = cMem.eG;
   task.uM = tM.motif[task.eM].u;
   task.vM = tM.motif[task.eM].v;
@@ -166,6 +172,7 @@ void Dispatcher::dispatch(Task& task) {
 
 std::vector<size_t> SearchEng::searchPhaseOne(Task& task) {
   std::cout << "Beginning search phase one" << std::endl;
+  std::cout << "eM " << task.eM << " and eG " << task.eG << std::endl;
   std::vector<size_t> fEdges;
   for (size_t i = 0; i < edgeList.size(); i++) {
     if ((task.uG >= 0 && task.vG >= 0)
@@ -204,7 +211,8 @@ void SearchEng::searchPhaseTwo(Task& task, std::vector<size_t> fEdges) {
       return;
     }
   }
-  task.type = backtrack; // Not really sure what to do here
+  task.eG = edgeList.size();
+  task.type = backtrack;
   return;
 }
 
@@ -252,6 +260,18 @@ Mint::Mint(TargetMotif m, std::vector<Edge> e) {
   tQ.setup(edgeList, tM.motif);  
 }
 
+void Mint::printResults() {
+  std::cout << "Results:" << std::endl;
+  for (size_t i = 0; i < results.store.size(); i++) {
+    for (size_t j = 0; j < results.store[i].size(); j++) {
+      std::cout << results.store[i][j].mNode << results.store[i][j].gNode <<
+          results.store[i][j].count << std::endl;
+    }
+    std::cout << "--------------------" << std::endl;
+  }
+  return;
+}
+
 void Mint::run() {
   while (!tQ.tasks.empty()) {
     // Find CU that is earliest in time to give a task to
@@ -285,5 +305,6 @@ void Mint::run() {
   }
   std::cout << "Total cycles taken: " << totalCycles << std::endl;
   std::cout << "End-to-end cycle count: " << maxCycles << std::endl;
+  printResults();
   return;
 }
