@@ -19,6 +19,21 @@ bool Task::isMapped(int gN, int mN) {
   return result;
 }
 
+bool Task::hasMap(int gN) {
+  bool result = false;
+  for (size_t i = 0; i < nodeMap.size(); i++) {
+    if (nodeMap[i].gNode == gN) {
+      if (nodeMap[i].count < 1) {
+        std::cerr << "Error: found a zero-count mapping in search" <<
+            std::endl;
+      }
+      result = true;
+      break;
+    }
+  }
+  return result;
+}
+
 void TaskQueue::setup(std::vector<Edge>& edgeList, std::vector<Edge>& motif) {
   for (size_t i = 0; i < edgeList.size(); i++) {
     Task t;
@@ -101,7 +116,7 @@ MgrStatus ContextMgr::updateContext(Task& task) {
       cMem.eG += 1;
       std::cout << "New eG is " << cMem.eG << std::endl;
       while (cMem.eG >= edgeList.size() || edgeList[cMem.eG].time > cMem.time) {
-        if (!cMem.eStack.empty()) {
+        if (!(cMem.eStack.size() == 1)) {
           status = dispatch;
           cMem.eG = cMem.eStack.top() + 1;
           cMem.eStack.pop();
@@ -123,7 +138,8 @@ MgrStatus ContextMgr::updateContext(Task& task) {
           cMem.eM--;
           std::cout << "Backtrack done, new eM " << cMem.eM << std::endl;
         } else {
-          std::cout << "Popped last edge, search tree complete" << std::endl;
+          std::cout << "Backtrack on root edge, search tree complete" <<
+              std::endl;
           status = end;
           break;
         }
@@ -184,7 +200,7 @@ std::vector<size_t> SearchEng::searchPhaseOne(Task& task) {
       fEdges.push_back(i);
     }
   }
-  std::cout << "Adjacency filtering leaves " << fEdges.size() << " edges" <<
+  std::cout << "Adjacency filtering gives " << fEdges.size() << " edges" <<
       std::endl;
   for (size_t i = 0; i < fEdges.size(); i++) {
     if (fEdges[i] < task.eG) {
@@ -192,7 +208,7 @@ std::vector<size_t> SearchEng::searchPhaseOne(Task& task) {
       i--;
     }
   }
-  std::cout << "Time order filtering leaves " << fEdges.size() << " edges" <<
+  std::cout << "Time order filtering gives " << fEdges.size() << " edges" <<
       std::endl;
   std::cout << "Phase one results:" << std::endl;
   for (size_t i = 0; i < fEdges.size(); i++) {
@@ -210,18 +226,16 @@ void SearchEng::searchPhaseTwo(Task& task, std::vector<size_t> fEdges) {
     fEdgesData.push_back(edgeList[fEdges[i]]);
   }
   for (size_t i = 0; i < fEdgesData.size(); i++) {
-    bool timeCheck = (fEdgesData[i].time <= task.time);
-    bool uCheck = (!task.isMapped(fEdgesData[i].u, task.uM));
-    bool vCheck = (!task.isMapped(fEdgesData[i].v, task.vM));
-    std::cout << "Phase two checks: " << timeCheck << uCheck << vCheck <<
-        std::endl;
-    if (fEdgesData[i].time <= task.time
-        && (!task.isMapped(fEdgesData[i].u, task.uM)
-            || !task.isMapped(fEdgesData[i].v, task.vM))) {
-      task.eG = fEdges[i];
-      task.type = bookkeep;
-      std::cout << "Edge match found" << std::endl;
-      return;
+    if (fEdgesData[i].time <= task.time) {
+      if ((task.isMapped(fEdgesData[i].u, task.uM)
+           || !task.hasMap(fEdgesData[i].u))
+          && (task.isMapped(fEdgesData[i].v, task.vM)
+              || !task.hasMap(fEdgesData[i].v))) {
+        task.eG = fEdges[i];
+        task.type = bookkeep;
+        std::cout << "Edge match found" << std::endl;
+        return;
+      }
     }
   }
   std::cout << "Edge match not found" << std::endl;
@@ -278,7 +292,8 @@ void Mint::printResults() {
   std::cout << "Results:" << std::endl;
   for (size_t i = 0; i < results.store.size(); i++) {
     for (size_t j = 0; j < results.store[i].size(); j++) {
-      std::cout << results.store[i][j].mNode << results.store[i][j].gNode <<
+      std::cout << results.store[i][j].mNode << " " <<
+          results.store[i][j].gNode << " " <<
           results.store[i][j].count << std::endl;
     }
     std::cout << "--------------------" << std::endl;

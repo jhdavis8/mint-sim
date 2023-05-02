@@ -50,6 +50,9 @@ class Task {
 
   // Return true iff there exists a Mapping in nodeMap between gN and mN.
   bool isMapped(int gN, int mN);
+
+  // Return true iff there exists a Mapping involving gN.
+  bool hasMap(int gN);
 };
 
 class TaskQueue {
