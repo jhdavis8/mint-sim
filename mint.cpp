@@ -44,6 +44,7 @@ void MappingStore::addResult(ContextMem& cMem) {
 MgrStatus ContextMgr::updateContext(Task& task) {
   MgrStatus status;
   cMem.busy = true;
+  cMem.eG = task.eG;
   switch (task.type) {
     case bookkeep:
       std::cout << "Context manager bookkeeping" << std::endl;
@@ -59,9 +60,17 @@ MgrStatus ContextMgr::updateContext(Task& task) {
         int vG = edgeList[task.eG].v;
         int uM = task.uM; // Motif data is correct from last update by dispatch
         int vM = task.vM;
-        bool uG_found = false;
-        bool vG_found = false;
         cMem.nodeMap = task.nodeMap;
+        if (!task.isMapped(uM, uG)) {
+          std::cout << "Pushing new u mapping: motif node " << uM <<
+              " to graph node " << uG << std::endl;
+          cMem.nodeMap.push_back(Mapping(uM, uG, 0));
+        }
+        if (!task.isMapped(vM, vG)) {
+          std::cout << "Pushing new v mapping: motif node " << vM <<
+              " to graph node " << vG << std::endl;
+          cMem.nodeMap.push_back(Mapping(vM, vG, 0));
+        }
         std::cout <<
             "Incrementing mapped edge counts for any mapped graph nodes" <<
             std::endl;
@@ -70,22 +79,10 @@ MgrStatus ContextMgr::updateContext(Task& task) {
         for (size_t i = 0; i < cMem.nodeMap.size(); i++) {
           if (cMem.nodeMap[i].gNode == uG) {
             cMem.nodeMap[i].count++;
-            uG_found = true;
           }
           if (cMem.nodeMap[i].gNode == vG) {
             cMem.nodeMap[i].count++;
-            vG_found = true;
           }
-        }
-        if (!uG_found) {
-          std::cout << "Pushing new u mapping: motif node " << uM <<
-              " to graph node " << uG << std::endl;
-          cMem.nodeMap.push_back(Mapping(uM, uG, 1));
-        }
-        if (!vG_found) {
-          std::cout << "Pushing new v mapping: motif node " << vM <<
-              " to graph node " << vG << std::endl;
-          cMem.nodeMap.push_back(Mapping(vM, vG, 0));
         }
         if (cMem.eStack.empty()) {
           cMem.time = edgeList[task.eG].time + motifTime;
@@ -93,8 +90,9 @@ MgrStatus ContextMgr::updateContext(Task& task) {
         }
         cMem.eStack.push(task.eG);
         cMem.eM += 1;
+        cMem.eG += 1;
+        cMem.busy = false;
         // need to figure out correct eM and eG management between task and cMem
-        // Also what about busy?
       }
       break;
     case backtrack:
@@ -105,7 +103,7 @@ MgrStatus ContextMgr::updateContext(Task& task) {
       while (cMem.eG >= edgeList.size() || edgeList[cMem.eG].time > cMem.time) {
         if (!cMem.eStack.empty()) {
           status = dispatch;
-          cMem.eG = cMem.eStack.top() + 1; // why add one here?
+          cMem.eG = cMem.eStack.top() + 1;
           cMem.eStack.pop();
           if (cMem.eStack.empty()) {
             cMem.time = INT_MAX;
@@ -186,11 +184,20 @@ std::vector<size_t> SearchEng::searchPhaseOne(Task& task) {
       fEdges.push_back(i);
     }
   }
+  std::cout << "Adjacency filtering leaves " << fEdges.size() << " edges" <<
+      std::endl;
   for (size_t i = 0; i < fEdges.size(); i++) {
     if (fEdges[i] < task.eG) {
       fEdges.erase(fEdges.begin() + i);
       i--;
     }
+  }
+  std::cout << "Time order filtering leaves " << fEdges.size() << " edges" <<
+      std::endl;
+  std::cout << "Phase one results:" << std::endl;
+  for (size_t i = 0; i < fEdges.size(); i++) {
+    std::cout << edgeList[fEdges[i]].u << " " << edgeList[fEdges[i]].v << " " <<
+        edgeList[fEdges[i]].time << std::endl;
   }
   return fEdges;
 }
@@ -203,14 +210,21 @@ void SearchEng::searchPhaseTwo(Task& task, std::vector<size_t> fEdges) {
     fEdgesData.push_back(edgeList[fEdges[i]]);
   }
   for (size_t i = 0; i < fEdgesData.size(); i++) {
-    if (fEdgesData[i].time < task.time
+    bool timeCheck = (fEdgesData[i].time <= task.time);
+    bool uCheck = (!task.isMapped(fEdgesData[i].u, task.uM));
+    bool vCheck = (!task.isMapped(fEdgesData[i].v, task.vM));
+    std::cout << "Phase two checks: " << timeCheck << uCheck << vCheck <<
+        std::endl;
+    if (fEdgesData[i].time <= task.time
         && (!task.isMapped(fEdgesData[i].u, task.uM)
-            || !task.isMapped(fEdgesData[i].u, task.uM))) {
-      task.eG = i;
+            || !task.isMapped(fEdgesData[i].v, task.vM))) {
+      task.eG = fEdges[i];
       task.type = bookkeep;
+      std::cout << "Edge match found" << std::endl;
       return;
     }
   }
+  std::cout << "Edge match not found" << std::endl;
   task.eG = edgeList.size();
   task.type = backtrack;
   return;
