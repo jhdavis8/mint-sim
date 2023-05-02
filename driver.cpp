@@ -26,7 +26,7 @@ size_t split(const std::string &txt, std::vector<std::string> &strs, char ch) {
 }
 
 int loadFiles(int argc, char** argv, std::vector<Edge>& edgeList,
-              std::array<Edge, MOTIF_SIZE>& motif) {
+              std::vector<Edge>& motif) {
   if (argc < 3) {
     std::cerr <<
         "Error: must provide temporal graph and target motif data files." <<
@@ -55,7 +55,7 @@ int loadFiles(int argc, char** argv, std::vector<Edge>& edgeList,
   }
   std::ifstream dataFileM(argv[2]);
   if (dataFileM.is_open()) {
-    int i = 0;
+    size_t i = 0;
     while (std::getline(dataFileM, line)) {
       std::vector<std::string> v;
       Edge e;
@@ -69,7 +69,7 @@ int loadFiles(int argc, char** argv, std::vector<Edge>& edgeList,
       e.u = std::stoi(v[0]);
       e.v = std::stoi(v[1]);
       e.time = std::stoi(v[2]);
-      motif[i] = e;
+      motif.push_back(e);
       i++;
     }
     dataFileM.close();

@@ -1,6 +1,5 @@
 // Mint simulator header file
 
-#include <array>
 #include <vector>
 #include <stack>
 #include <queue>
@@ -40,8 +39,8 @@ enum TaskType { search, bookkeep, backtrack };
 class Task {
  public:
   TaskType type;
-  int eG = -1;
-  int eM = -1;
+  size_t eG;
+  int eM = 0;
   int uG = -1;
   int vG = -1;
   int uM = -1;
@@ -58,20 +57,20 @@ class TaskQueue {
   std::queue<Task> tasks;
 
   // Fill TaskQueue with a root task for every node in graph.
-  void setup(std::vector<Edge>& edgeList);
+  void setup(std::vector<Edge>& edgeList, std::vector<Edge>& motif);
 };
 
 class TargetMotif {
  public:
-  std::array<Edge, MOTIF_SIZE> motif;
+  std::vector<Edge> motif;
   int time;
 };
 
 class ContextMem {
  public:
   bool busy = false;
-  int eG = -1;
-  int eM = -1;
+  size_t eG;
+  int eM = 0;
   int time = INT_MAX;
   std::stack<int> eStack;
   std::vector<Mapping> nodeMap;
@@ -134,10 +133,10 @@ class SearchEng {
       cMem(c), edgeList(eL), cycles(cyc) {}
 
   // Linear cache-line search for successor edges
-  std::vector<int> searchPhaseOne(Task& task);
+  std::vector<size_t> searchPhaseOne(Task& task);
 
   // Linear mapping check over filtered edges
-  void searchPhaseTwo(Task& task, std::vector<int> fEdges);
+  void searchPhaseTwo(Task& task, std::vector<size_t> fEdges);
 };
 
 class ComputeUnit {
@@ -169,7 +168,7 @@ class Mint {
   MappingStore results;
   std::vector<Edge> edgeList;
   
-  // Call setup method for TaskQueue.
+  // Call setup method for TaskQueue and construct ComputeUnits.
   void setup();
 
   // Start up each ComputeUnit loop, which will draw tasks from the TaskQueue to
