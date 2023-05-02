@@ -1,7 +1,7 @@
 .PHONY: all clean
 
 mint.exe: driver.cpp mint.cpp
-	clang++ -Og -o $@ $^
+	clang++ -Og -std=c++20 -o $@ $^
 
 all: mint.exe
 

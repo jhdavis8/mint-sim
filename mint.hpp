@@ -18,6 +18,10 @@ class Edge {
   int u;
   int v;
   int time;
+
+  Edge(int uN, int vN, int t): u(uN), v(vN), time(t) {}
+
+  Edge(): Edge(0, 0, 0) {}
 };
 
 class Mapping {
@@ -27,6 +31,8 @@ class Mapping {
   int count;
 
   Mapping(int m, int g, int c): mNode(m), gNode(g), count(c) {}
+
+  Mapping(): Mapping(0, 0, 0) {}
 };
 
 enum TaskType { search, bookkeep, backtrack };
@@ -58,6 +64,7 @@ class TaskQueue {
 class TargetMotif {
  public:
   std::array<Edge, MOTIF_SIZE> motif;
+  int time;
 };
 
 class ContextMem {
@@ -90,6 +97,8 @@ class ContextMgr {
   MappingStore& results;
   std::vector<Edge>& edgeList;
   int& cycles;
+  int motifSize;
+  int motifTime;
 
   // Link ContextMem, edgeList, and MappingStore to ContextMgr.
   ContextMgr(ContextMem& c, MappingStore& r, std::vector<Edge>& eL, int& cyc):
@@ -154,7 +163,7 @@ class ComputeUnit {
 
 class Mint {
  public:
-  std::array<ComputeUnit, NUM_CUS> cUnits;
+  std::vector<ComputeUnit> cUnits;
   TaskQueue tQ;
   TargetMotif tM;
   MappingStore results;

@@ -40,7 +40,8 @@ MgrStatus ContextMgr::updateContext(Task& task) {
     case bookkeep:
       if (task.eM == motifSize - 1) {
         status = remanage;
-        results.addResult(task);
+        cMem.nodeMap = task.nodeMap;
+        results.addResult(cMem);
       } else {
         status = dispatch;
         int uG = task.uG;
@@ -92,7 +93,7 @@ MgrStatus ContextMgr::updateContext(Task& task) {
               cMem.nodeMap[i].count--;
             }
             if (cMem.nodeMap[i].count == 0) {
-              cMem.nodeMap.erase(i);
+              cMem.nodeMap.erase(cMem.nodeMap.begin() + i);
               i--;
             }
           }
@@ -113,19 +114,19 @@ void Dispatcher::dispatch(Task& task) {
   task.type = search;
   task.eM = cMem.eM;
   task.eG = cMem.eG;
-  task.uM = tM.motif[eM].u;
-  task.vM = tM.motif[eM].v;
+  task.uM = tM.motif[task.eM].u;
+  task.vM = tM.motif[task.eM].v;
   auto iterator = std::ranges::find_if(cMem.nodeMap.begin(), cMem.nodeMap.end(),
                                        [&](Mapping i) { return i.mNode == task.uM; });
   if (iterator != cMem.nodeMap.end()) {
-    task.uG = *iterator;
+    task.uG = iterator->gNode;
   } else {
     task.uG = -1;
   }
   iterator = std::ranges::find_if(cMem.nodeMap.begin(), cMem.nodeMap.end(),
                                   [&](Mapping i) { return i.mNode == task.vM; });
   if (iterator != cMem.nodeMap.end()) {
-    task.vG = *iterator;
+    task.vG = iterator->gNode;
   } else {
     task.vG = -1;
   }
@@ -148,15 +149,15 @@ std::vector<int> SearchEng::searchPhaseOne(Task& task) {
     }
   }
   for (int i = 0; i < fEdges.size(); i++) {
-    if (fEdges[i] < eG) {
-      fEdges.erase(i);
+    if (fEdges[i] < task.eG) {
+      fEdges.erase(fEdges.begin() + i);
       i--;
     }
   }
   return fEdges;
 }
 
-void searchPhaseTwo(Task& task, std::vector<int> fEdges) {
+void SearchEng::searchPhaseTwo(Task& task, std::vector<int> fEdges) {
   // Fetch full edge data
   std::vector<Edge> fEdgesData;
   for (int i = 0; i < fEdges.size(); i++) {
@@ -199,34 +200,40 @@ void ComputeUnit::executeRootTask(Task t) {
 }
 
 void Mint::setup() {
+  tM.time = tM.motif.back().time - tM.motif.front().time;
   for (int i = 0; i < NUM_CUS; i++) {
-    cUnits[i] = ComputeUnit(results, tM, edgeList);
+    cUnits.push_back(ComputeUnit(results, tM, edgeList));
+    cUnits.back().cMgr.motifSize = tM.motif.size();
+    cUnits.back().cMgr.motifTime = tM.time;
   }
-  tQ.setup(std::vector<Edge>& edgeList);
+  tQ.setup(edgeList);
   return;
 }
 
 void Mint::run() {
-  while (!tQ.empty()) {
+  while (!tQ.tasks.empty()) {
     // Find CU that is earliest in time to give a task to
-    ComputeUnit& nextCU = cUnits[0];
+    int nextCU = 0;
+    int minCycles = INT_MIN;
     for (int i = 0; i < NUM_CUS; i++) {
-      if (cUnits[i].cycles < nextCU.cycles) {
-        nextCU = cUnits[i];
+      if (cUnits[i].cycles < minCycles) {
+        nextCU = i;
+        minCycles = cUnits[i].cycles;
       }
     }
-    nextCU.executeRootTask(tQ.pop(), results);
+    cUnits[nextCU].executeRootTask(tQ.tasks.front());
+    tQ.tasks.pop();
   }
   // Collect cycle stats
-  ComputeUnit& maxCU = cUnits[0];
+  int maxCycles = INT_MIN;
   int totalCycles = 0;
   for (int i = 0; i < NUM_CUS; i++) {
-    if (cUnits[i].cycles > maxCU.cycles) {
-      maxCU = cUnits[i];
+    if (cUnits[i].cycles > maxCycles) {
+      maxCycles = cUnits[i].cycles;
     }
     totalCycles += cUnits[i].cycles;
   }
   std::cout << "Total cycles taken: " << totalCycles << std::endl;
-  std::cout << "End-to-end cycle count: " << maxCU.cycles << std::endl;
+  std::cout << "End-to-end cycle count: " << maxCycles << std::endl;
   return;
 }
