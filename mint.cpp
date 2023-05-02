@@ -22,7 +22,7 @@ void TaskQueue::setup(std::vector<Edge>& edgeList) {
   for (int i = 0; i < edgeList.size(); i++) {
     Task t;
     t.eG = i;
-    t.type = backtrack;
+    t.type = bookkeep;
     tasks.push(t);
   }
   return;
@@ -38,8 +38,9 @@ MgrStatus ContextMgr::updateContext(Task& task) {
   cMem.busy = true;
   switch (task.type) {
     case bookkeep:
+      std::cout << "Context manager bookkeeping." << std::endl;
       if (task.eM == motifSize - 1) {
-        status = remanage;
+        status = remanage; // Motif found, step back to continue search
         cMem.nodeMap = task.nodeMap;
         results.addResult(cMem);
       } else {
@@ -76,6 +77,7 @@ MgrStatus ContextMgr::updateContext(Task& task) {
       }
       break;
     case backtrack:
+      std::cout << "Context manager backtracking." << std::endl;
       cMem.eG += 1;
       while (cMem.eG > edgeList.size() || edgeList[cMem.eG].time > cMem.time) {
         if (!cMem.eStack.empty()) {
@@ -135,6 +137,7 @@ void Dispatcher::dispatch(Task& task) {
 }
 
 std::vector<int> SearchEng::searchPhaseOne(Task& task) {
+  std::cout << "Beginning search phase one." << std::endl;
   std::vector<int> fEdges;
   for (int i = 0; i < edgeList.size(); i++) {
     if ((task.uG >= 0 && task.vG >= 0)
@@ -158,6 +161,7 @@ std::vector<int> SearchEng::searchPhaseOne(Task& task) {
 }
 
 void SearchEng::searchPhaseTwo(Task& task, std::vector<int> fEdges) {
+  std::cout << "Beginning search phase two." << std::endl;
   // Fetch full edge data
   std::vector<Edge> fEdgesData;
   for (int i = 0; i < fEdges.size(); i++) {
@@ -180,16 +184,21 @@ void ComputeUnit::executeRootTask(Task t) {
   bool working = true;
   while (working) {
     MgrStatus mStatus;
+    std::cout << "Updating context." << std::endl;
     mStatus = cMgr.updateContext(t);
     switch (mStatus) {
       case end:
+        std::cout << "Manager status: end" << std::endl;
         working = false;
         break;
       case dispatch:
+        std::cout << "Manager status: dispatch" << std::endl;
         disp.dispatch(t);
+        std::cout << "Beginning search." << std::endl;
         sEng.searchPhaseTwo(t, sEng.searchPhaseOne(t));
         break;
       case remanage:
+        std::cout << "Manager status: remanage" << std::endl;
         t.type = backtrack;
         break;
       default:
@@ -221,6 +230,11 @@ void Mint::run() {
         minCycles = cUnits[i].cycles;
       }
     }
+    if (minCycles == INT_MIN) {
+      minCycles = 0;
+    }
+    std::cout << "Executing root task " << tQ.tasks.front().eG << " with CU " <<
+        nextCU << " at cycle " << minCycles << "." << std::endl;
     cUnits[nextCU].executeRootTask(tQ.tasks.front());
     tQ.tasks.pop();
   }

@@ -145,7 +145,7 @@ class ComputeUnit {
   MappingStore& results;
   TargetMotif& tM;
   std::vector<Edge>& edgeList;
-  int cycles;
+  int cycles = 0;
   ContextMem cMem;
   ContextMgr cMgr;
   Dispatcher disp;
