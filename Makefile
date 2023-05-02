@@ -6,4 +6,4 @@ mint.exe: driver.cpp mint.cpp
 all: mint.exe
 
 clean:
-	rm mint.exe
+	rm mint.exe *~
