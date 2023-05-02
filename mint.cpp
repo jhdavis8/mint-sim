@@ -167,8 +167,11 @@ void Dispatcher::dispatch(Task& task) {
                                        });
   if (iterator != cMem.nodeMap.end()) {
     task.uG = iterator->gNode;
+    std::cout << "Found that uM " << task.uM << " mapped to uG " <<
+        task.uG << std::endl;
   } else {
     task.uG = -1;
+    std::cout << "No mapping found for uM " << task.uM << std::endl;
   }
   iterator = std::ranges::find_if(cMem.nodeMap.begin(), cMem.nodeMap.end(),
                                   [&](Mapping i) {
@@ -176,8 +179,11 @@ void Dispatcher::dispatch(Task& task) {
                                   });
   if (iterator != cMem.nodeMap.end()) {
     task.vG = iterator->gNode;
+    std::cout << "Found that vM " << task.vM << " mapped to vG " <<
+        task.vG << std::endl;
   } else {
     task.vG = -1;
+    std::cout << "No mapping found for vM " << task.vM << std::endl;
   }
   task.nodeMap = cMem.nodeMap;
   task.time = cMem.time;
@@ -188,15 +194,11 @@ std::vector<size_t> SearchEng::searchPhaseOne(Task& task) {
   std::cout << "Beginning search phase one" << std::endl;
   std::cout << "eM " << task.eM << " and eG " << task.eG << std::endl;
   std::vector<size_t> fEdges;
+  bool uCheck = (task.uG >= 0);
+  bool vCheck = (task.vG >= 0);
   for (size_t i = 0; i < edgeList.size(); i++) {
-    if ((task.uG >= 0 && task.vG >= 0)
-        && (edgeList[i].u == task.uG && edgeList[i].v == task.vG)) {
-      fEdges.push_back(i);
-    } else if (task.uG >= 0 && edgeList[i].u == task.uG) {
-      fEdges.push_back(i);
-    } else if (task.vG >= 0 && edgeList[i].v == task.vG) {
-      fEdges.push_back(i);
-    } else if (task.uG < 0 && task.vG < 0) {
+    if ((!uCheck || edgeList[i].u == task.uG)
+        && (!vCheck || edgeList[i].v == task.vG)) {
       fEdges.push_back(i);
     }
   }
