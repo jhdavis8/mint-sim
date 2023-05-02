@@ -9,7 +9,7 @@ bool Task::isMapped(int gN, int mN) {
   for (size_t i = 0; i < nodeMap.size(); i++) {
     if (nodeMap[i].gNode == gN && nodeMap[i].mNode == mN) {
       if (nodeMap[i].count < 1) {
-        std::cerr << "Error: found a zero-count mapping in search." <<
+        std::cerr << "Error: found a zero-count mapping in search" <<
             std::endl;
       }
       result = true;
@@ -31,7 +31,7 @@ void TaskQueue::setup(std::vector<Edge>& edgeList, std::vector<Edge>& motif) {
     t.type = bookkeep;
     tasks.push(t);
   }
-  std::cout << "Pushed " << tasks.size() << " root tasks." << std::endl;
+  std::cout << "Pushed " << tasks.size() << " root tasks" << std::endl;
   return;
 }
 
@@ -46,14 +46,14 @@ MgrStatus ContextMgr::updateContext(Task& task) {
   cMem.busy = true;
   switch (task.type) {
     case bookkeep:
-      std::cout << "Context manager bookkeeping." << std::endl;
+      std::cout << "Context manager bookkeeping" << std::endl;
       if (task.eM == motifSize - 1) {
-        std::cout << "Motif found, saving and backtracking." << std::endl;
+        std::cout << "Motif found, saving and backtracking" << std::endl;
         status = remanage; // Motif found, step back to continue search
         cMem.nodeMap = task.nodeMap;
         results.addResult(cMem);
       } else {
-        std::cout << "Preparing context memory for dispatch." << std::endl;
+        std::cout << "Preparing context memory for dispatch" << std::endl;
         status = dispatch;
         int uG = task.uG;
         int vG = task.vG;
@@ -63,9 +63,9 @@ MgrStatus ContextMgr::updateContext(Task& task) {
         bool vG_found = false;
         cMem.nodeMap = task.nodeMap;
         std::cout <<
-            "Incrementing mapped edge counts for any mapped graph nodes." <<
+            "Incrementing mapped edge counts for any mapped graph nodes" <<
             std::endl;
-        std::cout << "nodeMap has " << cMem.nodeMap.size() << " entries." <<
+        std::cout << "nodeMap has " << cMem.nodeMap.size() << " entries" <<
             std::endl;
         for (size_t i = 0; i < cMem.nodeMap.size(); i++) {
           if (cMem.nodeMap[i].gNode == uG) {
@@ -79,23 +79,17 @@ MgrStatus ContextMgr::updateContext(Task& task) {
         }
         if (!uG_found) {
           std::cout << "Pushing new u mapping: motif node " << uM <<
-              " to graph node " << uG << "." << std::endl;
+              " to graph node " << uG << std::endl;
           cMem.nodeMap.push_back(Mapping(uM, uG, 1));
         }
         if (!vG_found) {
           std::cout << "Pushing new v mapping: motif node " << vM <<
-              " to graph node " << vG << "." << std::endl;
+              " to graph node " << vG << std::endl;
           cMem.nodeMap.push_back(Mapping(vM, vG, 0));
         }
-        std::cout << "Checking if time bound must be set." << std::endl;
-        std::cout << task.eG << std::endl;
-        std::cout << edgeList[task.eG].time << std::endl;
-        std::cout << motifTime << std::endl;
-        std::cout << cMem.time << std::endl;
-        std::cout << cMem.eStack.size() << std::endl;
         if (cMem.eStack.empty()) {
           cMem.time = edgeList[task.eG].time + motifTime;
-          std::cout << "Set time bound: " << cMem.time << "." << std::endl;
+          std::cout << "Set time bound: " << cMem.time << std::endl;
         }
         cMem.eStack.push(task.eG);
         cMem.eM += 1;
@@ -104,7 +98,7 @@ MgrStatus ContextMgr::updateContext(Task& task) {
       }
       break;
     case backtrack:
-      std::cout << "Context manager backtracking." << std::endl;
+      std::cout << "Context manager backtracking" << std::endl;
       cMem.eG += 1;
       while (cMem.eG > edgeList.size() || edgeList[cMem.eG].time > cMem.time) {
         if (!cMem.eStack.empty()) {
@@ -135,7 +129,7 @@ MgrStatus ContextMgr::updateContext(Task& task) {
       break;
     default:
       status = end;
-      std::cerr << "Error: updateContext received invalid task type." <<
+      std::cerr << "Error: updateContext received invalid task type" <<
           std::endl;
   }
   return status;
@@ -165,12 +159,13 @@ void Dispatcher::dispatch(Task& task) {
   } else {
     task.vG = -1;
   }
+  task.nodeMap = cMem.nodeMap;
   task.time = cMem.time;
   return;
 }
 
 std::vector<size_t> SearchEng::searchPhaseOne(Task& task) {
-  std::cout << "Beginning search phase one." << std::endl;
+  std::cout << "Beginning search phase one" << std::endl;
   std::vector<size_t> fEdges;
   for (size_t i = 0; i < edgeList.size(); i++) {
     if ((task.uG >= 0 && task.vG >= 0)
@@ -194,7 +189,7 @@ std::vector<size_t> SearchEng::searchPhaseOne(Task& task) {
 }
 
 void SearchEng::searchPhaseTwo(Task& task, std::vector<size_t> fEdges) {
-  std::cout << "Beginning search phase two." << std::endl;
+  std::cout << "Beginning search phase two" << std::endl;
   // Fetch full edge data
   std::vector<Edge> fEdgesData;
   for (size_t i = 0; i < fEdges.size(); i++) {
@@ -217,7 +212,7 @@ void ComputeUnit::executeRootTask(Task t) {
   bool working = true;
   while (working) {
     MgrStatus mStatus;
-    std::cout << "Updating context." << std::endl;
+    std::cout << "Updating context" << std::endl;
     mStatus = cMgr.updateContext(t);
     switch (mStatus) {
       case end:
@@ -227,7 +222,7 @@ void ComputeUnit::executeRootTask(Task t) {
       case dispatch:
         std::cout << "Manager status: dispatch" << std::endl;
         disp.dispatch(t);
-        std::cout << "Beginning search." << std::endl;
+        std::cout << "Beginning search" << std::endl;
         sEng.searchPhaseTwo(t, sEng.searchPhaseOne(t));
         break;
       case remanage:
@@ -242,17 +237,19 @@ void ComputeUnit::executeRootTask(Task t) {
   return;
 }
 
-void Mint::setup() {
+Mint::Mint(TargetMotif m, std::vector<Edge> e) {
+  tM = m;
+  edgeList = e;
   tM.time = tM.motif.back().time - tM.motif.front().time;
   std::cout << "Target motif is " << tM.motif.size() << " edges and " <<
-      tM.time << " timesteps long." << std::endl;
+      tM.time << " timesteps long" << std::endl;
   for (size_t i = 0; i < NUM_CUS; i++) {
-    cUnits.push_back(ComputeUnit(results, tM, edgeList));
+    cMems.push_back(ContextMem());
+    cUnits.push_back(ComputeUnit(results, tM, edgeList, cMems.back()));
     cUnits.back().cMgr.motifSize = tM.motif.size();
     cUnits.back().cMgr.motifTime = tM.time;
   }
-  tQ.setup(edgeList, tM.motif);
-  return;
+  tQ.setup(edgeList, tM.motif);  
 }
 
 void Mint::run() {
@@ -270,9 +267,12 @@ void Mint::run() {
       minCycles = 0;
     }
     std::cout << "Executing root task " << tQ.tasks.front().eG << " with CU " <<
-        nextCU << " at cycle " << minCycles << "." << std::endl;
+        nextCU << " at cycle " << minCycles << std::endl;
     cUnits[nextCU].executeRootTask(tQ.tasks.front());
     tQ.tasks.pop();
+    std::cout <<
+        "--------------------------------------------------------------------------------"
+              << std::endl;
   }
   // Collect cycle stats
   int maxCycles = INT_MIN;

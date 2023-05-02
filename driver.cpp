@@ -81,15 +81,15 @@ int loadFiles(int argc, char** argv, std::vector<Edge>& edgeList,
 }
 
 int main(int argc, char** argv) {
-  std::cout << "Constructing Mint." << std::endl;
-  Mint mint;
+  TargetMotif tM;
+  std::vector<Edge> edgeList;
   std::cout << "Loading files." << std::endl;
-  int result = loadFiles(argc, argv, mint.edgeList, mint.tM.motif);
+  int result = loadFiles(argc, argv, edgeList, tM.motif);
   if (result != 0) {
     return result;
   }
-  std::cout << "Setting up Mint." << std::endl;
-  mint.setup();
+  std::cout << "Constructing Mint." << std::endl;
+  Mint mint(tM, edgeList);
   std::cout << "Running Mint." << std::endl;
   mint.run();
   return 0;

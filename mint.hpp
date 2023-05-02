@@ -145,16 +145,18 @@ class ComputeUnit {
   TargetMotif& tM;
   std::vector<Edge>& edgeList;
   int cycles = 0;
-  ContextMem cMem;
+  ContextMem& cMem;
   ContextMgr cMgr;
   Dispatcher disp;
   SearchEng sEng;
 
   // Link all components appropriately.
-  ComputeUnit(MappingStore& r, TargetMotif& t, std::vector<Edge>& eL):
-      results(r), tM(t), edgeList(eL), cMgr(cMem, results, edgeList, cycles),
-      disp(cMem, tM, cycles), sEng(cMem, edgeList, cycles) {}
-  
+  ComputeUnit(MappingStore& r, TargetMotif& t, std::vector<Edge>& eL,
+              ContextMem& c):
+      results(r), tM(t), edgeList(eL), cMem(c),
+      cMgr(c, results, edgeList, cycles), disp(c, tM, cycles),
+      sEng(c, edgeList, cycles) {}
+
   // Executes a root task to completion. Records total cycles taken. Writes
   // resulting finds to the MappingStore.
   void executeRootTask(Task t);
@@ -163,13 +165,14 @@ class ComputeUnit {
 class Mint {
  public:
   std::vector<ComputeUnit> cUnits;
+  std::vector<ContextMem> cMems;
   TaskQueue tQ;
   TargetMotif tM;
   MappingStore results;
   std::vector<Edge> edgeList;
-  
-  // Call setup method for TaskQueue and construct ComputeUnits.
-  void setup();
+
+  // Constructor
+  Mint(TargetMotif m, std::vector<Edge> e);
 
   // Start up each ComputeUnit loop, which will draw tasks from the TaskQueue to
   // pass to ContextMgr. This continues until the TaskQueue is empty. Final
