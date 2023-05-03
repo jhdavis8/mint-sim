@@ -148,9 +148,7 @@ MgrStatus ContextMgr::updateContext(Task& task) {
           //if (VERBOSE) std::cout << "Set time bound: " << cMem.time <<
           //                 std::endl;
         }
-        std::cout << cMem.eStack.size();
         cMem.eStack.push(task.eG);
-        std::cout << " " << cMem.eStack.size() << std::endl;
         cMem.eM += 1;
         cMem.eG += 1;
         cMem.busy = false;
@@ -159,8 +157,7 @@ MgrStatus ContextMgr::updateContext(Task& task) {
       break;
     case backtrack:
       if (VERBOSE) std::cout << "Context manager backtracking, current eG " <<
-                       cMem.eG << " and stack size " << cMem.eStack.size() <<
-                       std::endl;
+                       cMem.eG << std::endl;
       cMem.eG += 1;
       //if (VERBOSE) std::cout << "New eG is " << cMem.eG << std::endl;
       while (cMem.eG >= edgeList.size() || edgeList.at(cMem.eG).time > cMem.time) {
@@ -369,15 +366,15 @@ void Mint::run() {
     if (minCycles == INT_MIN) {
       minCycles = 0;
     }
-    if (VERBOSE) std::cout << "Executing root task " << tQ.tasks.front().eG <<
-                     " with CU " << nextCU << " at cycle " << minCycles <<
-                     std::endl;
+    std::cout << "Executing root task " << tQ.tasks.front().eG <<
+        " with CU " << nextCU << " at cycle " << minCycles <<
+        std::endl;
     cUnits.at(nextCU)->executeRootTask(tQ.tasks.front());
     tQ.tasks.pop();
     if (VERBOSE) std::cout << "There are " << results.store.size() <<
                      " results" << std::endl;
-    //if (VERBOSE) std::cout << "----------------------------------------"
-    //                       << std::endl;
+    if (VERBOSE) std::cout << "----------------------------------------"
+                           << std::endl;
   }
   // Collect cycle stats
   int maxCycles = INT_MIN;

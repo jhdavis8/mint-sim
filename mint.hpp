@@ -7,7 +7,7 @@
 
 #define NUM_CUS 8
 #define MOTIF_SIZE 5
-#define VERBOSE 1
+#define VERBOSE 0
 
 // *****************************************************************************
 // *                             Data Structures                               *
