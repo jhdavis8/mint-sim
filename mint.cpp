@@ -280,14 +280,13 @@ std::vector<size_t> SearchEng::searchPhaseOne(Task& task) {
   std::vector<size_t> fEdges2;
   if (VVERBOSE) std::cout << "Adjacency filtering gives " << fEdges.size() <<
                    " edges" << std::endl;
-  bool recorded = false;
-  for (size_t i = memo.getStart(uCheck, vCheck, task.uG, task.vG, task.eG, cycles);
+  for (size_t i = memo.getStart(uCheck, vCheck, task.uG, task.vG, task.eG, cycles, fEdges.size());
        i < fEdges.size(); i++) {
     if (fEdges.at(i) >= task.eG) {
       fEdges2.push_back(fEdges.at(i));
     }
     memo.record(uCheck, vCheck, task.uG, task.vG, root_eG, fEdges.at(i), i,
-                recorded, cycles);
+                cycles, fEdges);
     cycles += JMP_LATENCY*2 + MOV_LATENCY + CACHE_LATENCY;
   }
   if (VVERBOSE) std::cout << "Time order filtering gives " << fEdges2.size() <<

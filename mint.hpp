@@ -8,9 +8,10 @@
 
 #define NUM_CUS 512
 #define MOTIF_SIZE 5
+
 #define VERBOSE 0
 #define VVERBOSE 0
-#define FULL_ASYNC 0
+
 #define DEQUEUE_LATENCY 1
 #define CMEM_LATENCY 2
 #define CACHE_LATENCY 2
@@ -21,7 +22,12 @@
 #define DIV_LATENCY 15
 #define JMP_LATENCY 2
 #define MOV_LATENCY 1
+
+#define FULL_ASYNC 0
+
 #define USE_MEMO 1
+#define MEMO_SPAN 1
+#define MEMO_THRESH 32
 
 // *****************************************************************************
 // *                             Data Structures                               *
@@ -118,7 +124,17 @@ class MappingStore {
 
 class Memo {
  public:
-  int listIndex;
+  std::array<size_t, MEMO_SPAN> listIndex;
+  std::array<size_t, MEMO_SPAN> waypoints;
+  size_t waypointRange = 0;
+  size_t waypointInterval = 0;
+
+  Memo() {
+    for (int i = 0; i < MEMO_SPAN; i++) {
+      listIndex[i] = 0;
+      waypoints[i] = 0;
+    }
+  }
 };
 
 class MemoStruct {
@@ -128,40 +144,68 @@ class MemoStruct {
   
   // Return memoized starting index as appropriate given context
   size_t getStart(bool uCheck, bool vCheck, int uG, int vG, int eG,
-                  size_t& cycles) {
-    if (USE_MEMO && uCheck != vCheck) {
-      cycles += JMP_LATENCY*2;
-      if (uCheck) {
-        cycles += DRAM_LATENCY;
-        return outgoing[uG].listIndex;
+                  size_t& cycles, size_t size) {
+    if (USE_MEMO && size > MEMO_THRESH && uCheck != vCheck) {
+      cycles += JMP_LATENCY*2 + DRAM_LATENCY/4 + (CACHE_LATENCY*3)/4;
+      if (uCheck && outgoing.find(uG) != outgoing.end()) {
+        cycles += DRAM_LATENCY/4 + (CACHE_LATENCY*3)/4;
+        return outgoing[uG].listIndex[0];
+      } else if (vCheck && outgoing.find(vG) != outgoing.end()) {
+        cycles += DRAM_LATENCY/4 + (CACHE_LATENCY*3)/4;
+        return incoming[vG].listIndex[0];
       } else {
-        cycles += DRAM_LATENCY;
-        return incoming[vG].listIndex;
+        return 0;
       }
     } else {
+      cycles += JMP_LATENCY*USE_MEMO;
       return 0;
     }
   }
 
   // Memoize search index if appropriate
   void record(bool uCheck, bool vCheck, int uG, int vG, size_t root_eG,
-              size_t qI, size_t i, bool& recorded, size_t& cycles) {
-    if ((USE_MEMO && !recorded) && (uCheck != vCheck)) {
-      cycles += JMP_LATENCY*2;
-      if (uCheck && qI >= root_eG) {
+              size_t qI, size_t i, size_t& cycles,
+              std::vector<size_t>& fEdges) {
+    if ((USE_MEMO && fEdges.size() > MEMO_THRESH) && (uCheck != vCheck)) {
+      //if (MEMO_SPAN == 1) {
+      if (uCheck && qI >= root_eG && outgoing.find(uG) == outgoing.end()) {
         outgoing[uG] = Memo();
-        outgoing[uG].listIndex = i;
-        recorded = true;
-        cycles += DRAM_LATENCY;
+        outgoing[uG].listIndex[0] = i;
+        outgoing[uG].waypoints[0] = root_eG;
+        cycles += DRAM_LATENCY + JMP_LATENCY;
         return;
-      } else if (vCheck && qI >= root_eG) {
+      } else if (vCheck && qI >= root_eG && incoming.find(vG) == incoming.end()) {
         incoming[vG] = Memo();
-        incoming[vG].listIndex = i;
-        recorded = true;
-        cycles += DRAM_LATENCY;
+        incoming[vG].listIndex[0] = i;
+        incoming[vG].waypoints[0] = root_eG;
+        cycles += DRAM_LATENCY + JMP_LATENCY;
         return;
       }
+      /*
+      } else {
+        if (uCheck) {
+          if (outgoing.find(uG) == outgoing.end()) {
+            outgoing[uG] = Memo();
+            outgoing[uG].waypointRange = fEdges.back() - fEdges.front();
+            outgoing[uG].waypointInterval = outgoing[uG].waypointRange / (MEMO_SPAN + 2);
+            for (int i = 0; i < MEMO_SPAN; i++) {
+              outgoing[uG].waypoints[i] = (i+1)*outgoing[uG].waypointInterval;
+            }
+          }
+        } else if (vCheck) {
+          if (incoming.find(vG) == incoming.end()) {
+            incoming[vG] = Memo();
+            incoming[vG].waypointRange = fEdges.back() - fEdges.front();
+            incoming[vG].waypointInterval = incoming[vG].waypointRange / (MEMO_SPAN + 2);
+            for (int i = 0; i < MEMO_SPAN; i++) {
+              incoming[vG].waypoints[i] = (i+1)*outgoing[vG].waypointInterval;
+            }
+          }
+        }
+      }
+      */
     } else {
+      cycles += JMP_LATENCY*USE_MEMO;
       return;
     }
   }
