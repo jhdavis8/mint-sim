@@ -9,8 +9,7 @@ bool Task::isMapped(int gN, int mN) {
   for (size_t i = 0; i < nodeMap.size(); i++) {
     if (nodeMap[i].gNode == gN && nodeMap[i].mNode == mN) {
       if (nodeMap[i].count < 1) {
-        std::cerr << "Error: found a zero-count mapping in search" <<
-            std::endl;
+        std::cerr << "Error: found a zero-count mapping" << std::endl;
       }
       result = true;
       break;
@@ -23,15 +22,66 @@ bool Task::hasMap(int gN) {
   bool result = false;
   for (size_t i = 0; i < nodeMap.size(); i++) {
     if (nodeMap[i].gNode == gN) {
-      if (nodeMap[i].count < 1) {
-        std::cerr << "Error: found a zero-count mapping in search" <<
-            std::endl;
-      }
       result = true;
       break;
     }
   }
   return result;
+}
+
+void Task::insertMapping(int gN, int mN) {
+  if (VERBOSE) std::cout << "Inserting mapping between graph " << gN <<
+                   " and motif " << mN << std::endl;
+  bool exists = false;
+  for (size_t i = 0; i < nodeMap.size(); i++) {
+    if (nodeMap[i].gNode == gN && nodeMap[i].mNode == mN) {
+      if (nodeMap[i].count < 1) {
+        std::cerr << "Error: found a zero-count mapping" << std::endl;
+      }
+      nodeMap[i].count++;
+      exists = true;
+      if (VERBOSE) std::cout << "Incrementing existing mapping" << std::endl;
+      break;    
+    }
+  }
+  if (!exists) {
+    for (size_t i = 0; i < nodeMap.size(); i++) {
+      if (nodeMap[i].gNode == gN || nodeMap[i].mNode == mN) {
+        nodeMap.erase(nodeMap.begin() + i);
+        i--;
+        if (VERBOSE) std::cout << "Erased a mapping" << std::endl;
+      }
+    }
+    nodeMap.push_back(Mapping(mNode, gNode, 1));
+    if (VERBOSE) std::cout << "Pushing new mapping" << std::endl;
+  }
+  return;
+}
+
+void Task::removeMapping(int gN, int mN) {
+  if (VERBOSE) std::cout << "Removing mapping between graph " << gN <<
+                   " and motif " << mN << std::endl;
+  bool removed = false;
+  for (size_t i = 0; i < nodeMap.size(); i++) {
+    if (nodeMap[i].gNode == gN && nodeMap[i].mNode == mN) {
+      if (nodeMap[i].count == 1) {
+        nodeMap.erase(nodeMap.begin() + i);
+        i--;
+        removed = true;
+        if (VERBOSE) std::cout << "Erased a mapping" << std::endl;
+      } else if (nodeMap[i].count == 0) {
+        std::cerr << "Error: found a zero-count mapping" << std::endl;
+      } else {
+        nodeMap[i].count--;
+        removed = true;
+        if (VERBOSE) std::cout << "Decremented a mapping" << std::endl;
+      }
+    }
+  }
+  if (!removed) {
+    std::cerr << "Error: tried to remove a non-existent mapping." << std::endl;
+  }
+  return;
 }
 
 void TaskQueue::setup(std::vector<Edge>& edgeList, std::vector<Edge>& motif) {
@@ -46,7 +96,8 @@ void TaskQueue::setup(std::vector<Edge>& edgeList, std::vector<Edge>& motif) {
     t.type = bookkeep;
     tasks.push(t);
   }
-  std::cout << "Pushed " << tasks.size() << " root tasks" << std::endl;
+  if (VERBOSE) std::cout << "Pushed " << tasks.size() << " root tasks" <<
+                   std::endl;
   return;
 }
 
@@ -60,48 +111,31 @@ MgrStatus ContextMgr::updateContext(Task& task) {
   MgrStatus status;
   cMem.busy = true;
   cMem.eG = task.eG;
+  cMem.eM = task.eM;
   switch (task.type) {
     case bookkeep:
-      std::cout << "Context manager bookkeeping" << std::endl;
+      if (VERBOSE) std::cout << "Context manager bookkeeping" << std::endl;
       if (task.eM == motifSize - 1) {
-        std::cout << "Motif found, saving and backtracking" << std::endl;
+        if (VERBOSE) std::cout << "Motif found, saving and backtracking" <<
+                         std::endl;
         status = remanage; // Motif found, step back to continue search
         cMem.nodeMap = task.nodeMap;
         results.addResult(cMem);
       } else {
-        std::cout << "Bookkeeping mapped edge " << task.eG << std::endl;
+        if (VERBOSE) std::cout << "Bookkeeping mapped edge " << task.eG <<
+                         std::endl;
         status = dispatch;
-        int uG = edgeList[task.eG].u;
-        int vG = edgeList[task.eG].v;
-        int uM = task.uM; // Motif data is correct from last update by dispatch
-        int vM = task.vM;
+        cMem.uG = edgeList[task.eG].u;
+        cMem.vG = edgeList[task.eG].v;
+        cMem.uM = task.uM;
+        cMem.vM = task.vM;
+        task.insertMapping(cMem.uG, cMem.uM);
+        task.insertMapping(cMem.vG, cMem.vM);
         cMem.nodeMap = task.nodeMap;
-        if (!task.isMapped(uM, uG)) {
-          std::cout << "Pushing new u mapping: motif node " << uM <<
-              " to graph node " << uG << std::endl;
-          cMem.nodeMap.push_back(Mapping(uM, uG, 0));
-        }
-        if (!task.isMapped(vM, vG)) {
-          std::cout << "Pushing new v mapping: motif node " << vM <<
-              " to graph node " << vG << std::endl;
-          cMem.nodeMap.push_back(Mapping(vM, vG, 0));
-        }
-        std::cout <<
-            "Incrementing mapped edge counts for any mapped graph nodes" <<
-            std::endl;
-        std::cout << "nodeMap has " << cMem.nodeMap.size() << " entries" <<
-            std::endl;
-        for (size_t i = 0; i < cMem.nodeMap.size(); i++) {
-          if (cMem.nodeMap[i].gNode == uG) {
-            cMem.nodeMap[i].count++;
-          }
-          if (cMem.nodeMap[i].gNode == vG) {
-            cMem.nodeMap[i].count++;
-          }
-        }
         if (cMem.eStack.empty()) {
           cMem.time = edgeList[task.eG].time + motifTime;
-          std::cout << "Set time bound: " << cMem.time << std::endl;
+          if (VERBOSE) std::cout << "Set time bound: " << cMem.time <<
+                           std::endl;
         }
         cMem.eStack.push(task.eG);
         cMem.eM += 1;
@@ -111,36 +145,31 @@ MgrStatus ContextMgr::updateContext(Task& task) {
       }
       break;
     case backtrack:
-      std::cout << "Context manager backtracking, current eG " <<
-          cMem.eG << std::endl;
+      if (VERBOSE) std::cout << "Context manager backtracking, current eG " <<
+                       cMem.eG << std::endl;
       cMem.eG += 1;
-      std::cout << "New eG is " << cMem.eG << std::endl;
+      if (VERBOSE) std::cout << "New eG is " << cMem.eG << std::endl;
       while (cMem.eG >= edgeList.size() || edgeList[cMem.eG].time > cMem.time) {
         if (!(cMem.eStack.size() == 1)) {
           status = dispatch;
           cMem.eG = cMem.eStack.top() + 1;
+          if (VERBOSE) std::cout << "Reset eG to " << cMem.eG << std::endl;
           cMem.eStack.pop();
           if (cMem.eStack.empty()) {
             cMem.time = INT_MAX;
           }
-          for (size_t i = 0; i < cMem.nodeMap.size(); i++) {
-            if (cMem.nodeMap[i].gNode == task.uG) {
-              cMem.nodeMap[i].count--;
-            }
-            if (cMem.nodeMap[i].gNode == task.vG) {
-              cMem.nodeMap[i].count--;
-            }
-            if (cMem.nodeMap[i].count == 0) {
-              cMem.nodeMap.erase(cMem.nodeMap.begin() + i);
-              i--;
-            }
-          }
+          task.removeMapping(cMem.uG, cMem.uM);
+          task.removeMapping(cMem.vG, cMem.vM);
+          cMem.nodeMap = task.nodeMap;
           cMem.eM--;
-          std::cout << "Backtrack done, new eM " << cMem.eM << std::endl;
+          if (VERBOSE) std::cout << "Backtrack done, new eM " << cMem.eM <<
+                           std::endl;
         } else {
-          std::cout << "Backtrack on root edge, search tree complete" <<
-              std::endl;
+          if (VERBOSE) std::cout <<
+                           "Backtrack on root edge, search tree complete" <<
+                           std::endl;
           status = end;
+          cMem.eStack.pop();
           break;
         }
       }
@@ -167,11 +196,12 @@ void Dispatcher::dispatch(Task& task) {
                                        });
   if (iterator != cMem.nodeMap.end()) {
     task.uG = iterator->gNode;
-    std::cout << "Found that uM " << task.uM << " mapped to uG " <<
-        task.uG << std::endl;
+    if (VERBOSE) std::cout << "Found that uM " << task.uM << " mapped to uG " <<
+                     task.uG << std::endl;
   } else {
     task.uG = -1;
-    std::cout << "No mapping found for uM " << task.uM << std::endl;
+    if (VERBOSE) std::cout << "No mapping found for uM " << task.uM <<
+                     std::endl;
   }
   iterator = std::ranges::find_if(cMem.nodeMap.begin(), cMem.nodeMap.end(),
                                   [&](Mapping i) {
@@ -179,11 +209,12 @@ void Dispatcher::dispatch(Task& task) {
                                   });
   if (iterator != cMem.nodeMap.end()) {
     task.vG = iterator->gNode;
-    std::cout << "Found that vM " << task.vM << " mapped to vG " <<
-        task.vG << std::endl;
+    if (VERBOSE) std::cout << "Found that vM " << task.vM << " mapped to vG " <<
+                     task.vG << std::endl;
   } else {
     task.vG = -1;
-    std::cout << "No mapping found for vM " << task.vM << std::endl;
+    if (VERBOSE) std::cout << "No mapping found for vM " << task.vM <<
+                     std::endl;
   }
   task.nodeMap = cMem.nodeMap;
   task.time = cMem.time;
@@ -191,8 +222,9 @@ void Dispatcher::dispatch(Task& task) {
 }
 
 std::vector<size_t> SearchEng::searchPhaseOne(Task& task) {
-  std::cout << "Beginning search phase one" << std::endl;
-  std::cout << "eM " << task.eM << " and eG " << task.eG << std::endl;
+  if (VERBOSE) std::cout << "Beginning search phase one" << std::endl;
+  if (VERBOSE) std::cout << "eM " << task.eM << " and eG " << task.eG <<
+                   std::endl;
   std::vector<size_t> fEdges;
   bool uCheck = (task.uG >= 0);
   bool vCheck = (task.vG >= 0);
@@ -202,26 +234,27 @@ std::vector<size_t> SearchEng::searchPhaseOne(Task& task) {
       fEdges.push_back(i);
     }
   }
-  std::cout << "Adjacency filtering gives " << fEdges.size() << " edges" <<
-      std::endl;
+  if (VERBOSE) std::cout << "Adjacency filtering gives " << fEdges.size() <<
+                   " edges" << std::endl;
   for (size_t i = 0; i < fEdges.size(); i++) {
     if (fEdges[i] < task.eG) {
       fEdges.erase(fEdges.begin() + i);
       i--;
     }
   }
-  std::cout << "Time order filtering gives " << fEdges.size() << " edges" <<
-      std::endl;
-  std::cout << "Phase one results:" << std::endl;
+  if (VERBOSE) std::cout << "Time order filtering gives " << fEdges.size() <<
+                   " edges" << std::endl;
+  if (VERBOSE) std::cout << "Phase one results:" << std::endl;
   for (size_t i = 0; i < fEdges.size(); i++) {
-    std::cout << edgeList[fEdges[i]].u << " " << edgeList[fEdges[i]].v << " " <<
-        edgeList[fEdges[i]].time << std::endl;
+    if (VERBOSE) std::cout << edgeList[fEdges[i]].u << " " <<
+                     edgeList[fEdges[i]].v << " " <<
+                     edgeList[fEdges[i]].time << std::endl;
   }
   return fEdges;
 }
 
 void SearchEng::searchPhaseTwo(Task& task, std::vector<size_t> fEdges) {
-  std::cout << "Beginning search phase two" << std::endl;
+  if (VERBOSE) std::cout << "Beginning search phase two" << std::endl;
   // Fetch full edge data
   std::vector<Edge> fEdgesData;
   for (size_t i = 0; i < fEdges.size(); i++) {
@@ -235,12 +268,12 @@ void SearchEng::searchPhaseTwo(Task& task, std::vector<size_t> fEdges) {
               || !task.hasMap(fEdgesData[i].v))) {
         task.eG = fEdges[i];
         task.type = bookkeep;
-        std::cout << "Edge match found" << std::endl;
+        if (VERBOSE) std::cout << "Edge match found" << std::endl;
         return;
       }
     }
   }
-  std::cout << "Edge match not found" << std::endl;
+  if (VERBOSE) std::cout << "Edge match not found" << std::endl;
   task.eG = edgeList.size();
   task.type = backtrack;
   return;
@@ -250,21 +283,21 @@ void ComputeUnit::executeRootTask(Task t) {
   bool working = true;
   while (working) {
     MgrStatus mStatus;
-    std::cout << "Updating context" << std::endl;
+    if (VERBOSE) std::cout << "Updating context" << std::endl;
     mStatus = cMgr.updateContext(t);
     switch (mStatus) {
       case end:
-        std::cout << "Manager status: end" << std::endl;
+        if (VERBOSE) std::cout << "Manager status: end" << std::endl;
         working = false;
         break;
       case dispatch:
-        std::cout << "Manager status: dispatch" << std::endl;
+        if (VERBOSE) std::cout << "Manager status: dispatch" << std::endl;
         disp.dispatch(t);
-        std::cout << "Beginning search" << std::endl;
+        if (VERBOSE) std::cout << "Beginning search" << std::endl;
         sEng.searchPhaseTwo(t, sEng.searchPhaseOne(t));
         break;
       case remanage:
-        std::cout << "Manager status: remanage" << std::endl;
+        if (VERBOSE) std::cout << "Manager status: remanage" << std::endl;
         t.type = backtrack;
         break;
       default:
@@ -279,8 +312,8 @@ Mint::Mint(TargetMotif m, std::vector<Edge> e) {
   tM = m;
   edgeList = e;
   tM.time = tM.motif.back().time - tM.motif.front().time;
-  std::cout << "Target motif is " << tM.motif.size() << " edges and " <<
-      tM.time << " timesteps long" << std::endl;
+  if (VERBOSE) std::cout << "Target motif is " << tM.motif.size() <<
+                   " edges and " << tM.time << " timesteps long" << std::endl;
   for (size_t i = 0; i < NUM_CUS; i++) {
     cMems.push_back(ContextMem());
     cUnits.push_back(ComputeUnit(results, tM, edgeList, cMems.back()));
@@ -295,8 +328,8 @@ void Mint::printResults() {
   for (size_t i = 0; i < results.store.size(); i++) {
     for (size_t j = 0; j < results.store[i].size(); j++) {
       std::cout << results.store[i][j].mNode << " " <<
-          results.store[i][j].gNode << " " <<
-          results.store[i][j].count << std::endl;
+                       results.store[i][j].gNode << " " <<
+                       results.store[i][j].count << std::endl;
     }
     std::cout << "--------------------" << std::endl;
   }
@@ -317,13 +350,13 @@ void Mint::run() {
     if (minCycles == INT_MIN) {
       minCycles = 0;
     }
-    std::cout << "Executing root task " << tQ.tasks.front().eG << " with CU " <<
-        nextCU << " at cycle " << minCycles << std::endl;
+    if (VERBOSE) std::cout << "Executing root task " << tQ.tasks.front().eG <<
+                     " with CU " << nextCU << " at cycle " << minCycles <<
+                     std::endl;
     cUnits[nextCU].executeRootTask(tQ.tasks.front());
     tQ.tasks.pop();
-    std::cout <<
-        "--------------------------------------------------------------------------------"
-              << std::endl;
+    if (VERBOSE) std::cout << "----------------------------------------"
+                           << std::endl;
   }
   // Collect cycle stats
   int maxCycles = INT_MIN;

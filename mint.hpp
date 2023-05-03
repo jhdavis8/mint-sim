@@ -7,6 +7,7 @@
 
 #define NUM_CUS 8
 #define MOTIF_SIZE 5
+#define VERBOSE 1
 
 // *****************************************************************************
 // *                             Data Structures                               *
@@ -53,6 +54,12 @@ class Task {
 
   // Return true iff there exists a Mapping involving gN.
   bool hasMap(int gN);
+
+  // Add a mapping between the given nodes to the nodeMap.
+  void insertMapping(int gN, int mN);
+
+  // Remove a mapping between the given nodes from the nodeMap.
+  void removeMapping(int gN, int mN);
 };
 
 class TaskQueue {
@@ -74,6 +81,10 @@ class ContextMem {
   bool busy = false;
   size_t eG;
   int eM = 0;
+  int uG;
+  int vG;
+  int uM;
+  int vM;
   int time = INT_MAX;
   std::stack<int> eStack;
   std::vector<Mapping> nodeMap;
