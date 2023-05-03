@@ -29,7 +29,7 @@ bool Task::hasMap(int gN) {
   return result;
 }
 
-void Task::insertMapping(int gN, int mN) {
+void Task::insertMapping(int gN, int mN, size_t& cycles) {
   if (VERBOSE) std::cout << "Inserting mapping between graph " << gN <<
                    " and motif " << mN << std::endl;
   bool exists = false;
@@ -39,9 +39,10 @@ void Task::insertMapping(int gN, int mN) {
         std::cerr << "Error: found a zero-count mapping" << std::endl;
       }
       nodeMap.at(i).count++;
+      cycles += CMEM_LATENCY + ADD_LATENCY;
       exists = true;
-      //if (VERBOSE) std::cout << "Incrementing existing mapping" << std::endl;
-      break;    
+      if (VVERBOSE) std::cout << "Incrementing existing mapping" << std::endl;
+      break;
     }
   }
   if (!exists) {
@@ -49,16 +50,17 @@ void Task::insertMapping(int gN, int mN) {
       if (nodeMap.at(i).gNode == gN || nodeMap.at(i).mNode == mN) {
         nodeMap.erase(nodeMap.begin() + i);
         i--;
-        //if (VERBOSE) std::cout << "Erased a mapping" << std::endl;
+        if (VVERBOSE) std::cout << "Erased a mapping" << std::endl;
       }
     }
     nodeMap.push_back(Mapping(mN, gN, 1));
-    //if (VERBOSE) std::cout << "Pushing new mapping" << std::endl;
+    cycles += CMEM_LATENCY*3;
+    if (VVERBOSE) std::cout << "Pushing new mapping" << std::endl;
   }
   return;
 }
 
-void Task::removeMapping(int gN, int mN) {
+void Task::removeMapping(int gN, int mN, size_t& cycles) {
   if (VERBOSE) std::cout << "Removing mapping between graph " << gN <<
                    " and motif " << mN << std::endl;
   bool removed = false;
@@ -67,14 +69,16 @@ void Task::removeMapping(int gN, int mN) {
       if (nodeMap.at(i).count == 1) {
         nodeMap.erase(nodeMap.begin() + i);
         i--;
+        cycles += CMEM_LATENCY*3;
         removed = true;
-        //if (VERBOSE) std::cout << "Erased a mapping" << std::endl;
+        if (VVERBOSE) std::cout << "Erased a mapping" << std::endl;
       } else if (nodeMap.at(i).count == 0) {
         std::cerr << "Error: found a zero-count mapping" << std::endl;
       } else {
         nodeMap.at(i).count--;
+        cycles += CMEM_LATENCY + ADD_LATENCY;
         removed = true;
-        //if (VERBOSE) std::cout << "Decremented a mapping" << std::endl;
+        if (VVERBOSE) std::cout << "Decremented a mapping" << std::endl;
       }
     }
   }
@@ -123,6 +127,7 @@ MgrStatus ContextMgr::updateContext(Task& task) {
   cMem.busy = true;
   cMem.eG = task.eG;
   cMem.eM = task.eM;
+  cycles += CMEM_LATENCY*3 + JMP_LATENCY;
   switch (task.type) {
     case bookkeep:
      if (VERBOSE) std::cout << "Context manager bookkeeping" << std::endl;
@@ -132,6 +137,8 @@ MgrStatus ContextMgr::updateContext(Task& task) {
         status = remanage; // Motif found, step back to continue search
         cMem.nodeMap = task.nodeMap;
         results.addResult(cMem);
+        cycles += CMEM_LATENCY*3*task.nodeMap.size();
+        cycles += DRAM_LATENCY*3*task.nodeMap.size();
       } else {
         if (VERBOSE) std::cout << "Bookkeeping mapped edge " << task.eG <<
                          std::endl;
@@ -140,18 +147,22 @@ MgrStatus ContextMgr::updateContext(Task& task) {
         cMem.vG = edgeList.at(task.eG).v;
         cMem.uM = task.uM;
         cMem.vM = task.vM;
-        task.insertMapping(cMem.uG, cMem.uM);
-        task.insertMapping(cMem.vG, cMem.vM);
+        cycles += CMEM_LATENCY*4 + CACHE_LATENCY*2;
+        task.insertMapping(cMem.uG, cMem.uM, cycles);
+        task.insertMapping(cMem.vG, cMem.vM, cycles);
         cMem.nodeMap = task.nodeMap;
+        cycles += JMP_LATENCY;
         if (cMem.eStack.empty()) {
           cMem.time = edgeList.at(task.eG).time + motifTime;
-          //if (VERBOSE) std::cout << "Set time bound: " << cMem.time <<
-          //                 std::endl;
+          cycles += CMEM_LATENCY + ADD_LATENCY + DRAM_LATENCY;
+          if (VVERBOSE) std::cout << "Set time bound: " << cMem.time <<
+                           std::endl;
         }
         cMem.eStack.push(task.eG);
         cMem.eM += 1;
         cMem.eG += 1;
         cMem.busy = false;
+        cycles += CMEM_LATENCY*4 + ADD_LATENCY*2;
         // need to figure out correct eM and eG management between task and cMem
       }
       break;
@@ -159,12 +170,15 @@ MgrStatus ContextMgr::updateContext(Task& task) {
       if (VERBOSE) std::cout << "Context manager backtracking, current eG " <<
                        cMem.eG << std::endl;
       cMem.eG += 1;
-      //if (VERBOSE) std::cout << "New eG is " << cMem.eG << std::endl;
+      cycles += CMEM_LATENCY + ADD_LATENCY;
+      if (VVERBOSE) std::cout << "New eG is " << cMem.eG << std::endl;
       while (cMem.eG >= edgeList.size() || edgeList.at(cMem.eG).time > cMem.time) {
+        cycles += JMP_LATENCY*2 + CMEM_LATENCY*2 + DRAM_LATENCY;
         if (!(cMem.eStack.size() == 1)) {
           status = dispatch;
           cMem.eG = cMem.eStack.top() + 1;
-          if (VERBOSE) std::cout << "Reset eG to " << cMem.eG << std::endl;
+          cycles += CMEM_LATENCY*2 + ADD_LATENCY;
+          if (VVERBOSE) std::cout << "Reset eG to " << cMem.eG << std::endl;
           cMem.eStack.pop();
           if (cMem.eStack.empty()) {
             cMem.time = INT_MAX;
@@ -174,21 +188,25 @@ MgrStatus ContextMgr::updateContext(Task& task) {
           }
           int last_eG = cMem.eG - 1;
           cMem.eM--;
-          //cMem.uG = edgeList[last_eG].u;
-          //cMem.vG = edgeList[last_eG].v;
-          //cMem.uM = ;
-          //cMem.vM = ;
-          task.removeMapping(cMem.uG, cMem.uM);
-          task.removeMapping(cMem.vG, cMem.vM);
+          cycles += ADD_LATENCY*2 + CMEM_LATENCY*2;
+          /*
+          cMem.uG = edgeList[last_eG].u;
+          cMem.vG = edgeList[last_eG].v;
+          cMem.uM = ;
+          cMem.vM = ;
+          */
+          task.removeMapping(cMem.uG, cMem.uM, cycles);
+          task.removeMapping(cMem.vG, cMem.vM, cycles);
           cMem.nodeMap = task.nodeMap;
-          //if (VERBOSE) std::cout << "Backtrack done, new eM " << cMem.eM <<
-          //                 std::endl;
+          if (VVERBOSE) std::cout << "Backtrack done, new eM " << cMem.eM <<
+                           std::endl;
         } else {
-          //if (VERBOSE) std::cout <<
-          //                 "Backtrack on root edge, search tree complete" <<
-          //                 std::endl;
+          if (VVERBOSE) std::cout <<
+                           "Backtrack on root edge, search tree complete" <<
+                           std::endl;
           status = end;
           cMem.eStack.pop();
+          cycles += CMEM_LATENCY;
           break;
         }
       }
@@ -209,18 +227,19 @@ void Dispatcher::dispatch(Task& task) {
   task.eG = cMem.eG;
   task.uM = tM.motif.at(task.eM).u;
   task.vM = tM.motif.at(task.eM).v;
+  cycles += CMEM_LATENCY*4;
   auto iterator = std::ranges::find_if(cMem.nodeMap.begin(), cMem.nodeMap.end(),
                                        [&](Mapping i) {
                                          return i.mNode == task.uM;
                                        });
   if (iterator != cMem.nodeMap.end()) {
     task.uG = iterator->gNode;
-    //if (VERBOSE) std::cout << "Found that uM " << task.uM << " mapped to uG " <<
-    //                 task.uG << std::endl;
+    if (VVERBOSE) std::cout << "Found that uM " << task.uM << " mapped to uG " <<
+                     task.uG << std::endl;
   } else {
     task.uG = -1;
-    //if (VERBOSE) std::cout << "No mapping found for uM " << task.uM <<
-    //                 std::endl;
+    if (VVERBOSE) std::cout << "No mapping found for uM " << task.uM <<
+                     std::endl;
   }
   iterator = std::ranges::find_if(cMem.nodeMap.begin(), cMem.nodeMap.end(),
                                   [&](Mapping i) {
@@ -228,56 +247,63 @@ void Dispatcher::dispatch(Task& task) {
                                   });
   if (iterator != cMem.nodeMap.end()) {
     task.vG = iterator->gNode;
-    //if (VERBOSE) std::cout << "Found that vM " << task.vM << " mapped to vG " <<
-    //                 task.vG << std::endl;
+    if (VVERBOSE) std::cout << "Found that vM " << task.vM << " mapped to vG " <<
+                     task.vG << std::endl;
   } else {
     task.vG = -1;
-    //if (VERBOSE) std::cout << "No mapping found for vM " << task.vM <<
-    //                 std::endl;
+    if (VVERBOSE) std::cout << "No mapping found for vM " << task.vM <<
+                     std::endl;
   }
+  cycles += JMP_LATENCY*2 + CMEM_LATENCY*2 + MOV_LATENCY*2;
   task.nodeMap = cMem.nodeMap;
   task.time = cMem.time;
+  cycles += CMEM_LATENCY*2;
   return;
 }
 
 std::vector<size_t> SearchEng::searchPhaseOne(Task& task) {
-  //if (VERBOSE) std::cout << "Beginning search phase one" << std::endl;
-  //if (VERBOSE) std::cout << "eM " << task.eM << " and eG " << task.eG <<
-  //                 std::endl;
+  if (VVERBOSE) std::cout << "Beginning search phase one" << std::endl;
+  if (VVERBOSE) std::cout << "eM " << task.eM << " and eG " << task.eG <<
+                   std::endl;
   std::vector<size_t> fEdges;
   bool uCheck = (task.uG >= 0);
   bool vCheck = (task.vG >= 0);
+  cycles += MOV_LATENCY*2;
   for (size_t i = 0; i < edgeList.size(); i++) {
     if ((!uCheck || edgeList.at(i).u == task.uG)
         && (!vCheck || edgeList.at(i).v == task.vG)) {
       fEdges.push_back(i);
     }
   }
-  //if (VERBOSE) std::cout << "Adjacency filtering gives " << fEdges.size() <<
-  //                 " edges" << std::endl;
+  // Linear search in parallel, accrue latency once per cache line
+  cycles += (CACHE_LATENCY*2 + JMP_LATENCY*2 + MOV_LATENCY)*(edgeList.size()/8);
+  if (VVERBOSE) std::cout << "Adjacency filtering gives " << fEdges.size() <<
+                   " edges" << std::endl;
   for (size_t i = 0; i < fEdges.size(); i++) {
     if (fEdges.at(i) < task.eG) {
       fEdges.erase(fEdges.begin() + i);
       i--;
     }
   }
-  //if (VERBOSE) std::cout << "Time order filtering gives " << fEdges.size() <<
-  //                 " edges" << std::endl;
-  //if (VERBOSE) std::cout << "Phase one results:" << std::endl;
+  cycles += (JMP_LATENCY*2 + MOV_LATENCY + CACHE_LATENCY)*(fEdges.size()/16);
+  if (VVERBOSE) std::cout << "Time order filtering gives " << fEdges.size() <<
+                   " edges" << std::endl;
+  if (VVERBOSE) std::cout << "Phase one results:" << std::endl;
   for (size_t i = 0; i < fEdges.size(); i++) {
-    //if (VERBOSE) std::cout << edgeList.at(fEdges.at(i)).u << " " <<
-    //                 edgeList.at(fEdges.at(i)).v << " " <<
-    //                 edgeList.at(fEdges.at(i)).time << std::endl;
+    if (VVERBOSE) std::cout << edgeList.at(fEdges.at(i)).u << " " <<
+                     edgeList.at(fEdges.at(i)).v << " " <<
+                     edgeList.at(fEdges.at(i)).time << std::endl;
   }
   return fEdges;
 }
 
 void SearchEng::searchPhaseTwo(Task& task, std::vector<size_t> fEdges) {
-  //if (VERBOSE) std::cout << "Beginning search phase two" << std::endl;
+  if (VVERBOSE) std::cout << "Beginning search phase two" << std::endl;
   // Fetch full edge data
   std::vector<Edge> fEdgesData;
   for (size_t i = 0; i < fEdges.size(); i++) {
     fEdgesData.push_back(edgeList.at(fEdges.at(i)));
+    cycles += ADD_LATENCY + (DRAM_LATENCY*3)/4 + (CACHE_LATENCY*3*3)/4;
   }
   for (size_t i = 0; i < fEdgesData.size(); i++) {
     if (fEdgesData.at(i).time <= task.time) {
@@ -287,12 +313,13 @@ void SearchEng::searchPhaseTwo(Task& task, std::vector<size_t> fEdges) {
               || !task.hasMap(fEdgesData.at(i).v))) {
         task.eG = fEdges.at(i);
         task.type = bookkeep;
-        //if (VERBOSE) std::cout << "Edge match found" << std::endl;
+        if (VVERBOSE) std::cout << "Edge match found" << std::endl;
         return;
       }
     }
+    cycles += JMP_LATENCY*5 + MOV_LATENCY*2;
   }
-  //if (VERBOSE) std::cout << "Edge match not found" << std::endl;
+  if (VVERBOSE) std::cout << "Edge match not found" << std::endl;
   task.eG = edgeList.size();
   task.type = backtrack;
   return;
@@ -302,21 +329,23 @@ void ComputeUnit::executeRootTask(Task t) {
   bool working = true;
   while (working) {
     MgrStatus mStatus;
-    //if (VERBOSE) std::cout << "Updating context" << std::endl;
+    if (VVERBOSE) std::cout << "Updating context" << std::endl;
+    cycles += TASK_LATENCY;
     mStatus = cMgr.updateContext(t);
     switch (mStatus) {
       case end:
-        //if (VERBOSE) std::cout << "Manager status: end" << std::endl;
+        if (VVERBOSE) std::cout << "Manager status: end" << std::endl;
         working = false;
         break;
       case dispatch:
-        //if (VERBOSE) std::cout << "Manager status: dispatch" << std::endl;
+        if (VVERBOSE) std::cout << "Manager status: dispatch" << std::endl;
         disp.dispatch(t);
         if (VERBOSE) std::cout << "Beginning search" << std::endl;
+        cycles += TASK_LATENCY;
         sEng.searchPhaseTwo(t, sEng.searchPhaseOne(t));
         break;
       case remanage:
-        //if (VERBOSE) std::cout << "Manager status: remanage" << std::endl;
+        if (VVERBOSE) std::cout << "Manager status: remanage" << std::endl;
         t.type = backtrack;
         break;
       default:
@@ -356,13 +385,13 @@ void Mint::printResults() {
 }
 
 void Mint::run() {
-#pragma omp parallel num_threads(NUM_CUS)
+#pragma omp parallel
   {
     #pragma omp single
     {
       while (!tQ.tasks.empty()) {
         int nextCU = 0;
-        int minCycles = INT_MIN;  
+        size_t minCycles = (size_t)-1;
         if (FULL_ASYNC) {
           // Find CU that is earliest in time to give a task to
           for (size_t i = 0; i < NUM_CUS; i++) {
@@ -371,19 +400,17 @@ void Mint::run() {
               minCycles = cUnits.at(i)->cycles;
             }
           }
-          if (minCycles == INT_MIN) {
-            minCycles = 0;
-          }
         } else {
           // Do static assignment like in the paper
           nextCU = tQ.tasks.front().eG % NUM_CUS;
           minCycles = cUnits.at(nextCU)->cycles;
         }
         Task nextTask = tQ.tasks.front();
-        std::cout << "Executing root task " << nextTask.eG << " with CU " <<
-            nextCU << " at cycle " << minCycles << std::endl;
+        if (VERBOSE) std::cout << "Executing root task " << nextTask.eG << " with CU " <<
+                         nextCU << " at cycle " << minCycles << std::endl;
 #pragma omp task depend(inout: cUnits.at(nextCU)) firstprivate(nextTask, tQ, tM, edgeList) shared(results)
         {
+          cUnits.at(nextCU)->cycles += DEQUEUE_LATENCY;
           cUnits.at(nextCU)->executeRootTask(nextTask);
         }
         tQ.tasks.pop();
@@ -395,17 +422,17 @@ void Mint::run() {
     }
   }
   // Collect cycle stats
-  int maxCycles = INT_MIN;
-  int totalCycles = 0;
+  size_t maxCycles = 0;
+  size_t totalCycles = 0;
   for (size_t i = 0; i < NUM_CUS; i++) {
     if (cUnits.at(i)->cycles > maxCycles) {
       maxCycles = cUnits.at(i)->cycles;
     }
     totalCycles += cUnits.at(i)->cycles;
   }
+  if (VERBOSE) printResults();
   std::cout << "Total cycles taken: " << totalCycles << std::endl;
   std::cout << "End-to-end cycle count: " << maxCycles << std::endl;
-  printResults();
   std::cout << "There are " << results.store.size() << " results" << std::endl;
   for (size_t i = 0; i < NUM_CUS; i++) {
     delete cMems.at(i);

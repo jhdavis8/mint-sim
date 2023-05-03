@@ -5,10 +5,21 @@
 #include <queue>
 #include <bits/stdc++.h>
 
-#define NUM_CUS 8
+#define NUM_CUS 512
 #define MOTIF_SIZE 5
 #define VERBOSE 0
+#define VVERBOSE 0
 #define FULL_ASYNC 0
+#define DEQUEUE_LATENCY 1
+#define CMEM_LATENCY 2
+#define CACHE_LATENCY 2
+#define DRAM_LATENCY 20
+#define TASK_LATENCY 5
+#define ADD_LATENCY 1
+#define MUL_LATENCY 3
+#define DIV_LATENCY 15
+#define JMP_LATENCY 2
+#define MOV_LATENCY 1
 
 // *****************************************************************************
 // *                             Data Structures                               *
@@ -57,10 +68,10 @@ class Task {
   bool hasMap(int gN);
 
   // Add a mapping between the given nodes to the nodeMap.
-  void insertMapping(int gN, int mN);
+  void insertMapping(int gN, int mN, size_t& cycles);
 
   // Remove a mapping between the given nodes from the nodeMap.
-  void removeMapping(int gN, int mN);
+  void removeMapping(int gN, int mN, size_t& cycles);
 
  private:
   // Print the entries of the nodeMap
@@ -114,12 +125,12 @@ class ContextMgr {
   ContextMem& cMem;
   MappingStore& results;
   std::vector<Edge>& edgeList;
-  int& cycles;
+  size_t& cycles;
   int motifSize;
   int motifTime;
 
   // Link ContextMem, edgeList, and MappingStore to ContextMgr.
-  ContextMgr(ContextMem& c, MappingStore& r, std::vector<Edge>& eL, int& cyc):
+  ContextMgr(ContextMem& c, MappingStore& r, std::vector<Edge>& eL, size_t& cyc):
       cMem(c), results(r), edgeList(eL), cycles(cyc) {}
 
   // Update ContextMem according to info in task. Returns a status code to
@@ -131,10 +142,10 @@ class Dispatcher {
  public:
   ContextMem& cMem;
   TargetMotif& tM;
-  int& cycles;
+  size_t& cycles;
 
   // Link Dispatcher to ContentMem and TargetMotif.
-  Dispatcher(ContextMem& c, TargetMotif& m, int& cyc):
+  Dispatcher(ContextMem& c, TargetMotif& m, size_t& cyc):
       cMem(c), tM(m), cycles(cyc) {}
 
   // Load necessary data into task from TargetMotif and ContextMem.
@@ -145,10 +156,10 @@ class SearchEng {
  public:
   ContextMem& cMem;
   std::vector<Edge>& edgeList;
-  int& cycles;
+  size_t& cycles;
 
   // Link SearchEng to ContextMem.
-  SearchEng(ContextMem& c, std::vector<Edge>& eL, int& cyc):
+  SearchEng(ContextMem& c, std::vector<Edge>& eL, size_t& cyc):
       cMem(c), edgeList(eL), cycles(cyc) {}
 
   // Linear cache-line search for successor edges
@@ -163,7 +174,7 @@ class ComputeUnit {
   MappingStore& results;
   TargetMotif& tM;
   std::vector<Edge>& edgeList;
-  int cycles = 0;
+  size_t cycles = 0;
   ContextMem& cMem;
   ContextMgr cMgr;
   Dispatcher disp;
