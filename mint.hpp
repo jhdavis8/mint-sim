@@ -4,6 +4,7 @@
 #include <stack>
 #include <queue>
 #include <unordered_map>
+#include <iostream>
 #include <bits/stdc++.h>
 
 #define NUM_CUS 512
@@ -21,11 +22,17 @@
 #define DIV_LATENCY 15
 #define JMP_LATENCY 2
 #define MOV_LATENCY 1
-#define CACHE_MISS 0.10
+#ifndef CACHE_MISS
+#define CACHE_MISS 0.20
+#endif
 #define CACHE_HIT (1-CACHE_MISS)
 #define CACHE_EXP ((int)(DRAM_LATENCY*CACHE_MISS) + (int)(CACHE_LATENCY*CACHE_HIT))
-#define USE_MEMO 0
-#define MEMO_THRESH 0
+#ifndef USE_MEMO
+#define USE_MEMO 1
+#endif
+#ifndef MEMO_THRESH
+#define MEMO_THRESH 256
+#endif
 
 // *****************************************************************************
 // *                             Data Structures                               *
@@ -132,8 +139,9 @@ class MemoStruct {
   
   // Return memoized starting index as appropriate given context
   size_t getStart(bool uCheck, bool vCheck, int uG, int vG, int eG,
-                  size_t& cycles) {
-    if ((USE_MEMO && /*size check*/1) && uCheck != vCheck) {
+                  size_t size, size_t& cycles) {
+    if ((USE_MEMO && size > MEMO_THRESH) && uCheck != vCheck) {
+      if (VVERBOSE) std::cout << "Checking for memo" << std::endl;
       cycles += JMP_LATENCY*2;
       if (uCheck && outgoing.find(uG) != outgoing.end()) {
         cycles += CACHE_LATENCY;
@@ -151,8 +159,9 @@ class MemoStruct {
 
   // Memoize search index if appropriate
   void record(bool uCheck, bool vCheck, int uG, int vG, size_t root_eG,
-              size_t qI, size_t i, bool& recorded, size_t& cycles) {
-    if (USE_MEMO && ((/*size check*/1 && !recorded) && (uCheck != vCheck))) {
+              size_t qI, size_t i, bool& recorded, size_t size, size_t& cycles) {
+    if (USE_MEMO && ((size > MEMO_THRESH && !recorded) && (uCheck != vCheck))) {
+      if (VVERBOSE) std::cout << "Trying to record memo" << std::endl;
       cycles += JMP_LATENCY*2;
       if (uCheck && (outgoing.find(uG) == outgoing.end() && qI >= root_eG)) {
         outgoing[uG] = Memo();
