@@ -21,7 +21,11 @@
 #define DIV_LATENCY 15
 #define JMP_LATENCY 2
 #define MOV_LATENCY 1
-#define USE_MEMO 1
+#define CACHE_MISS 0.10
+#define CACHE_HIT (1-CACHE_MISS)
+#define CACHE_EXP ((int)(DRAM_LATENCY*CACHE_MISS) + (int)(CACHE_LATENCY*CACHE_HIT))
+#define USE_MEMO 0
+#define MEMO_THRESH 0
 
 // *****************************************************************************
 // *                             Data Structures                               *
@@ -129,14 +133,16 @@ class MemoStruct {
   // Return memoized starting index as appropriate given context
   size_t getStart(bool uCheck, bool vCheck, int uG, int vG, int eG,
                   size_t& cycles) {
-    if (USE_MEMO && uCheck != vCheck) {
+    if ((USE_MEMO && /*size check*/1) && uCheck != vCheck) {
       cycles += JMP_LATENCY*2;
-      if (uCheck) {
-        cycles += DRAM_LATENCY;
+      if (uCheck && outgoing.find(uG) != outgoing.end()) {
+        cycles += CACHE_LATENCY;
         return outgoing[uG].listIndex;
-      } else {
-        cycles += DRAM_LATENCY;
+      } else if (vCheck && incoming.find(vG) != incoming.end()) {
+        cycles += CACHE_LATENCY;
         return incoming[vG].listIndex;
+      } else {
+        return 0;
       }
     } else {
       return 0;
@@ -146,15 +152,16 @@ class MemoStruct {
   // Memoize search index if appropriate
   void record(bool uCheck, bool vCheck, int uG, int vG, size_t root_eG,
               size_t qI, size_t i, bool& recorded, size_t& cycles) {
-    if ((USE_MEMO && !recorded) && (uCheck != vCheck)) {
+    if (USE_MEMO && ((/*size check*/1 && !recorded) && (uCheck != vCheck))) {
       cycles += JMP_LATENCY*2;
-      if (uCheck && qI >= root_eG) {
+      if (uCheck && (outgoing.find(uG) == outgoing.end() && qI >= root_eG)) {
         outgoing[uG] = Memo();
         outgoing[uG].listIndex = i;
         recorded = true;
         cycles += DRAM_LATENCY;
         return;
-      } else if (vCheck && qI >= root_eG) {
+      } else if (vCheck &&
+                 (incoming.find(vG) == incoming.end() && qI >= root_eG)) {
         incoming[vG] = Memo();
         incoming[vG].listIndex = i;
         recorded = true;

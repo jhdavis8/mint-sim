@@ -147,14 +147,14 @@ MgrStatus ContextMgr::updateContext(Task& task) {
         cMem.vG = edgeList.at(task.eG).v;
         cMem.uM = task.uM;
         cMem.vM = task.vM;
-        cycles += CMEM_LATENCY*4 + CACHE_LATENCY*2;
+        cycles += CMEM_LATENCY*4 + CACHE_EXP*2;
         task.insertMapping(cMem.uG, cMem.uM, cycles);
         task.insertMapping(cMem.vG, cMem.vM, cycles);
         cMem.nodeMap = task.nodeMap;
         cycles += JMP_LATENCY;
         if (cMem.eStack.empty()) {
           cMem.time = edgeList.at(task.eG).time + motifTime;
-          cycles += CMEM_LATENCY + ADD_LATENCY + DRAM_LATENCY;
+          cycles += CMEM_LATENCY + ADD_LATENCY + CACHE_EXP;
           if (VVERBOSE) std::cout << "Set time bound: " << cMem.time <<
                            std::endl;
         }
@@ -173,7 +173,7 @@ MgrStatus ContextMgr::updateContext(Task& task) {
       cycles += CMEM_LATENCY + ADD_LATENCY;
       if (VVERBOSE) std::cout << "New eG is " << cMem.eG << std::endl;
       while (cMem.eG >= edgeList.size() || edgeList.at(cMem.eG).time > cMem.time) {
-        cycles += JMP_LATENCY*2 + CMEM_LATENCY*2 + DRAM_LATENCY;
+        cycles += JMP_LATENCY*2 + CMEM_LATENCY*2 + CACHE_EXP;
         if (!(cMem.eStack.size() == 1)) {
           status = dispatch;
           cMem.eG = cMem.eStack.top() + 1;
@@ -276,7 +276,7 @@ std::vector<size_t> SearchEng::searchPhaseOne(Task& task) {
     }
   }
   // Linear search in parallel, accrue latency once per cache line
-  cycles += (CACHE_LATENCY*2 + JMP_LATENCY*2 + MOV_LATENCY)*(edgeList.size()/8);
+  cycles += (CACHE_EXP*2 + JMP_LATENCY*2 + MOV_LATENCY + ADD_LATENCY)*(edgeList.size()/8);
   std::vector<size_t> fEdges2;
   if (VVERBOSE) std::cout << "Adjacency filtering gives " << fEdges.size() <<
                    " edges" << std::endl;
@@ -288,7 +288,7 @@ std::vector<size_t> SearchEng::searchPhaseOne(Task& task) {
     }
     memo.record(uCheck, vCheck, task.uG, task.vG, root_eG, fEdges.at(i), i,
                 recorded, cycles);
-    cycles += JMP_LATENCY*2 + MOV_LATENCY + CACHE_LATENCY;
+    cycles += JMP_LATENCY*2 + MOV_LATENCY + CACHE_EXP + ADD_LATENCY;
   }
   if (VVERBOSE) std::cout << "Time order filtering gives " << fEdges2.size() <<
                    " edges" << std::endl;
@@ -307,7 +307,7 @@ void SearchEng::searchPhaseTwo(Task& task, std::vector<size_t> fEdges) {
   std::vector<Edge> fEdgesData;
   for (size_t i = 0; i < fEdges.size(); i++) {
     fEdgesData.push_back(edgeList.at(fEdges.at(i)));
-    cycles += ADD_LATENCY + (DRAM_LATENCY*3)/4 + (CACHE_LATENCY*3*3)/4;
+    cycles += ADD_LATENCY + CACHE_EXP*3;
   }
   for (size_t i = 0; i < fEdgesData.size(); i++) {
     if (fEdgesData.at(i).time <= task.time) {
