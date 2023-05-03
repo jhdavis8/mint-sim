@@ -1,7 +1,8 @@
 .PHONY: all clean test
 
 mint.exe: driver.cpp mint.cpp
-	clang++ -Wall -O3 -std=c++20 -o $@ $^
+#clang++ -fopenmp -Wall -O3 -std=c++20 -o $@ $^
+	g++ -fopenmp -Wall -O3 -std=c++20 -o $@ $^
 
 all: mint.exe
 

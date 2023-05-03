@@ -8,6 +8,7 @@
 #define NUM_CUS 8
 #define MOTIF_SIZE 5
 #define VERBOSE 0
+#define FULL_ASYNC 0
 
 // *****************************************************************************
 // *                             Data Structures                               *

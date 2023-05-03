@@ -113,8 +113,8 @@ void TaskQueue::setup(std::vector<Edge>& edgeList, std::vector<Edge>& motif) {
 }
 
 void MappingStore::addResult(ContextMem& cMem) {
+#pragma omp critical
   store.push_back(cMem.nodeMap);
-  // need to make sure this saves a copy not a reference
   return;
 }
 
@@ -353,28 +353,43 @@ void Mint::printResults() {
 }
 
 void Mint::run() {
-  while (!tQ.tasks.empty()) {
-    // Find CU that is earliest in time to give a task to
-    int nextCU = 0;
-    int minCycles = INT_MIN;
-    for (size_t i = 0; i < NUM_CUS; i++) {
-      if (cUnits.at(i)->cycles < minCycles) {
-        nextCU = i;
-        minCycles = cUnits.at(i)->cycles;
+#pragma omp parallel num_threads(NUM_CUS)
+  {
+    #pragma omp single
+    {
+      while (!tQ.tasks.empty()) {
+        int nextCU = 0;
+        int minCycles = INT_MIN;  
+        if (FULL_ASYNC) {
+          // Find CU that is earliest in time to give a task to
+          for (size_t i = 0; i < NUM_CUS; i++) {
+            if (cUnits.at(i)->cycles < minCycles) {
+              nextCU = i;
+              minCycles = cUnits.at(i)->cycles;
+            }
+          }
+          if (minCycles == INT_MIN) {
+            minCycles = 0;
+          }
+        } else {
+          // Do static assignment like in the paper
+          nextCU = tQ.tasks.front().eG % NUM_CUS;
+          minCycles = cUnits.at(nextCU)->cycles;
+        }
+        Task nextTask = tQ.tasks.front();
+        std::cout << "Executing root task " << nextTask.eG << " with CU " <<
+            nextCU << " at cycle " << minCycles << std::endl;
+#pragma omp task depend(inout: cUnits.at(nextCU)) firstprivate(nextTask)
+        {
+          cUnits.at(nextCU)->executeRootTask(nextTask);
+        }
+        tQ.tasks.pop();
+        if (VERBOSE) std::cout << "There are " << results.store.size() <<
+                         " results" << std::endl;
+        if (VERBOSE) std::cout << "----------------------------------------"
+                               << std::endl;
       }
     }
-    if (minCycles == INT_MIN) {
-      minCycles = 0;
-    }
-    std::cout << "Executing root task " << tQ.tasks.front().eG <<
-        " with CU " << nextCU << " at cycle " << minCycles <<
-        std::endl;
-    cUnits.at(nextCU)->executeRootTask(tQ.tasks.front());
-    tQ.tasks.pop();
-    if (VERBOSE) std::cout << "There are " << results.store.size() <<
-                     " results" << std::endl;
-    if (VERBOSE) std::cout << "----------------------------------------"
-                           << std::endl;
   }
   // Collect cycle stats
   int maxCycles = INT_MIN;
