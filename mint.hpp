@@ -60,6 +60,10 @@ class Task {
 
   // Remove a mapping between the given nodes from the nodeMap.
   void removeMapping(int gN, int mN);
+
+ private:
+  // Print the entries of the nodeMap
+  void printNodeMap();
 };
 
 class TaskQueue {
@@ -178,8 +182,8 @@ class ComputeUnit {
 
 class Mint {
  public:
-  std::vector<ComputeUnit> cUnits;
-  std::vector<ContextMem> cMems;
+  std::vector<ComputeUnit*> cUnits;
+  std::vector<ContextMem*> cMems;
   TaskQueue tQ;
   TargetMotif tM;
   MappingStore results;
