@@ -424,7 +424,7 @@ void Mint::run() {
                                << std::endl;
       }
     }
-  }
+  } // implied taskwait
   // Collect cycle stats
   size_t maxCycles = 0;
   size_t totalCycles = 0;

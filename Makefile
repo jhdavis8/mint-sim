@@ -6,7 +6,7 @@ mint.exe: driver.cpp mint.cpp mint.hpp Makefile
 all: mint.exe
 
 clean:
-	rm mint.exe *~
+	rm mint.exe *~ 2> /dev/null || echo > /dev/null
 
 test: mint.exe
 	./mint.exe data/test-1.txt motifs/m1-test.txt
