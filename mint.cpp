@@ -168,6 +168,9 @@ MgrStatus ContextMgr::updateContext(Task& task) {
           cMem.eStack.pop();
           if (cMem.eStack.empty()) {
             cMem.time = INT_MAX;
+            std::cerr << "Popped the last edge, this shouldn't happen" <<
+                std::endl;
+            throw "Invalid edge pop";
           }
           int last_eG = cMem.eG - 1;
           cMem.eM--;
@@ -379,7 +382,7 @@ void Mint::run() {
         Task nextTask = tQ.tasks.front();
         std::cout << "Executing root task " << nextTask.eG << " with CU " <<
             nextCU << " at cycle " << minCycles << std::endl;
-#pragma omp task depend(inout: cUnits.at(nextCU)) firstprivate(nextTask)
+#pragma omp task depend(inout: cUnits.at(nextCU)) firstprivate(nextTask, tQ, tM, edgeList) shared(results)
         {
           cUnits.at(nextCU)->executeRootTask(nextTask);
         }
@@ -403,6 +406,7 @@ void Mint::run() {
   std::cout << "Total cycles taken: " << totalCycles << std::endl;
   std::cout << "End-to-end cycle count: " << maxCycles << std::endl;
   printResults();
+  std::cout << "There are " << results.store.size() << " results" << std::endl;
   for (size_t i = 0; i < NUM_CUS; i++) {
     delete cMems.at(i);
     delete cUnits.at(i);
