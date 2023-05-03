@@ -3,6 +3,7 @@
 #include <vector>
 #include <stack>
 #include <queue>
+#include <unordered_map>
 #include <bits/stdc++.h>
 
 #define NUM_CUS 512
@@ -20,6 +21,7 @@
 #define DIV_LATENCY 15
 #define JMP_LATENCY 2
 #define MOV_LATENCY 1
+#define USE_MEMO 1
 
 // *****************************************************************************
 // *                             Data Structures                               *
@@ -114,6 +116,57 @@ class MappingStore {
   void addResult(ContextMem& cMem);
 };
 
+class Memo {
+ public:
+  int listIndex;
+};
+
+class MemoStruct {
+ public:
+  std::unordered_map<size_t, Memo> outgoing;
+  std::unordered_map<size_t, Memo> incoming;
+  
+  // Return memoized starting index as appropriate given context
+  size_t getStart(bool uCheck, bool vCheck, int uG, int vG, int eG,
+                  size_t& cycles) {
+    if (USE_MEMO && uCheck != vCheck) {
+      cycles += JMP_LATENCY*2;
+      if (uCheck) {
+        cycles += DRAM_LATENCY;
+        return outgoing[uG].listIndex;
+      } else {
+        cycles += DRAM_LATENCY;
+        return incoming[vG].listIndex;
+      }
+    } else {
+      return 0;
+    }
+  }
+
+  // Memoize search index if appropriate
+  void record(bool uCheck, bool vCheck, int uG, int vG, size_t root_eG,
+              size_t qI, size_t i, bool& recorded, size_t& cycles) {
+    if ((USE_MEMO && !recorded) && (uCheck != vCheck)) {
+      cycles += JMP_LATENCY*2;
+      if (uCheck && qI >= root_eG) {
+        outgoing[uG] = Memo();
+        outgoing[uG].listIndex = i;
+        recorded = true;
+        cycles += DRAM_LATENCY;
+        return;
+      } else if (vCheck && qI >= root_eG) {
+        incoming[vG] = Memo();
+        incoming[vG].listIndex = i;
+        recorded = true;
+        cycles += DRAM_LATENCY;
+        return;
+      }
+    } else {
+      return;
+    }
+  }
+};
+
 // *****************************************************************************
 // *                         Architecture Components                           *
 // *****************************************************************************
@@ -157,10 +210,12 @@ class SearchEng {
   ContextMem& cMem;
   std::vector<Edge>& edgeList;
   size_t& cycles;
+  MemoStruct& memo;
+  int root_eG;
 
   // Link SearchEng to ContextMem.
-  SearchEng(ContextMem& c, std::vector<Edge>& eL, size_t& cyc):
-      cMem(c), edgeList(eL), cycles(cyc) {}
+  SearchEng(ContextMem& c, std::vector<Edge>& eL, size_t& cyc, MemoStruct& m):
+      cMem(c), edgeList(eL), cycles(cyc), memo(m) {}
 
   // Linear cache-line search for successor edges
   std::vector<size_t> searchPhaseOne(Task& task);
@@ -179,13 +234,14 @@ class ComputeUnit {
   ContextMgr cMgr;
   Dispatcher disp;
   SearchEng sEng;
+  MemoStruct memo;
 
   // Link all components appropriately.
   ComputeUnit(MappingStore& r, TargetMotif& t, std::vector<Edge>& eL,
               ContextMem& c):
       results(r), tM(t), edgeList(eL), cMem(c),
       cMgr(c, results, edgeList, cycles), disp(c, tM, cycles),
-      sEng(c, edgeList, cycles) {}
+      sEng(c, edgeList, cycles, memo) {}
 
   // Executes a root task to completion. Records total cycles taken. Writes
   // resulting finds to the MappingStore.

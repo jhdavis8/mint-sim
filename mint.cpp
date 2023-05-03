@@ -186,7 +186,7 @@ MgrStatus ContextMgr::updateContext(Task& task) {
                 std::endl;
             throw "Invalid edge pop";
           }
-          int last_eG = cMem.eG - 1;
+          //int last_eG = cMem.eG - 1;
           cMem.eM--;
           cycles += ADD_LATENCY*2 + CMEM_LATENCY*2;
           /*
@@ -277,24 +277,28 @@ std::vector<size_t> SearchEng::searchPhaseOne(Task& task) {
   }
   // Linear search in parallel, accrue latency once per cache line
   cycles += (CACHE_LATENCY*2 + JMP_LATENCY*2 + MOV_LATENCY)*(edgeList.size()/8);
+  std::vector<size_t> fEdges2;
   if (VVERBOSE) std::cout << "Adjacency filtering gives " << fEdges.size() <<
                    " edges" << std::endl;
-  for (size_t i = 0; i < fEdges.size(); i++) {
-    if (fEdges.at(i) < task.eG) {
-      fEdges.erase(fEdges.begin() + i);
-      i--;
+  bool recorded = false;
+  for (size_t i = memo.getStart(uCheck, vCheck, task.uG, task.vG, task.eG, cycles);
+       i < fEdges.size(); i++) {
+    if (fEdges.at(i) >= task.eG) {
+      fEdges2.push_back(fEdges.at(i));
     }
+    memo.record(uCheck, vCheck, task.uG, task.vG, root_eG, fEdges.at(i), i,
+                recorded, cycles);
+    cycles += JMP_LATENCY*2 + MOV_LATENCY + CACHE_LATENCY;
   }
-  cycles += (JMP_LATENCY*2 + MOV_LATENCY + CACHE_LATENCY)*(fEdges.size()/16);
-  if (VVERBOSE) std::cout << "Time order filtering gives " << fEdges.size() <<
+  if (VVERBOSE) std::cout << "Time order filtering gives " << fEdges2.size() <<
                    " edges" << std::endl;
   if (VVERBOSE) std::cout << "Phase one results:" << std::endl;
-  for (size_t i = 0; i < fEdges.size(); i++) {
-    if (VVERBOSE) std::cout << edgeList.at(fEdges.at(i)).u << " " <<
-                     edgeList.at(fEdges.at(i)).v << " " <<
-                     edgeList.at(fEdges.at(i)).time << std::endl;
+  for (size_t i = 0; i < fEdges2.size(); i++) {
+    if (VVERBOSE) std::cout << edgeList.at(fEdges2.at(i)).u << " " <<
+                     edgeList.at(fEdges2.at(i)).v << " " <<
+                     edgeList.at(fEdges2.at(i)).time << std::endl;
   }
-  return fEdges;
+  return fEdges2;
 }
 
 void SearchEng::searchPhaseTwo(Task& task, std::vector<size_t> fEdges) {
@@ -327,6 +331,7 @@ void SearchEng::searchPhaseTwo(Task& task, std::vector<size_t> fEdges) {
 
 void ComputeUnit::executeRootTask(Task t) {
   bool working = true;
+  sEng.root_eG = t.eG;
   while (working) {
     MgrStatus mStatus;
     if (VVERBOSE) std::cout << "Updating context" << std::endl;
