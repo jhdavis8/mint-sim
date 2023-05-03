@@ -1,0 +1,5 @@
+Loading files
+Running Mint
+Total cycles taken: 243182683424
+End-to-end cycle count: 19877979595
+There are 1475314 results
