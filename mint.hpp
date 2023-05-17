@@ -28,7 +28,7 @@
 #define CACHE_HIT (1-CACHE_MISS)
 #define CACHE_EXP ((int)(DRAM_LATENCY*CACHE_MISS) + (int)(CACHE_LATENCY*CACHE_HIT))
 #ifndef USE_MEMO
-#define USE_MEMO 1
+#define USE_MEMO 0
 #endif
 #ifndef MEMO_THRESH
 #define MEMO_THRESH 256
