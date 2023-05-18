@@ -1,0 +1,8 @@
+CACHE_MISS: 0.4
+CACHE_HIT: 0.6
+CACHE_EXP: 9
+Loading files
+Running Mint
+Total cycles taken: 1453192204436
+End-to-end cycle count: 193160139270
+There are 6896302 results
